@@ -23,6 +23,8 @@
 # - `tail -f ingest_babel.log` (so you can watch progress)
 # - In another terminal session, watch memory usage using `top`
 
+# Thank you to Gaurav Vaidya for helpful information about Babel!
+
 import bmt
 import htmllistparse
 import math
