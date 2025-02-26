@@ -483,6 +483,7 @@ with create_empty_database(DATABASE_FILE_NAME,
                              file_name,
                              conn=conn,
                              log_work=LOG_WORK,
-                             total_size=files_info[file_name])
+                             total_size=files_info[file_name],
+                             insrt_missing_taxa=True)
 
     create_deferred_indices(conn, LOG_WORK)
