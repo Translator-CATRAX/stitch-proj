@@ -465,6 +465,7 @@ with create_empty_database(DATABASE_FILE_NAME,
                                if li.endswith('.txt'))
         sorted_listing = sorted(pruned_listing,
                                 key=lambda li: 0 if li == TAXON_FILE else 1)
+        print(f"ingesting compendia files at: {BABEL_COMPENDIA_URL}")
         for file_name in sorted_listing:
             print(f"ingesting file: {file_name} size: {files_info[file_name]}")
             ingest_jsonl_url(BABEL_COMPENDIA_URL +
