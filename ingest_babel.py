@@ -24,7 +24,7 @@ import sqlite3
 import time
 
 
-DATABASE_FILE_NAME = 'nodenorm.sqlite'
+DATABASE_FILE_NAME = 'babel.sqlite'
 CHUNK_SIZE = 100000
 BIOLINK_PREFIX = 'biolink:'
 TAXON_NAME = 'OrganismTaxon'
