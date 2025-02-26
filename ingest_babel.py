@@ -408,7 +408,7 @@ def ingest_jsonl_url(url: str,
                 sub_end_str = "" if total_size is not None else "\n"
                 elapsed_time = (time.time() - start_time)
                 elapsed_time_str = convert_seconds(elapsed_time)
-                print(f"; elapsed time: {elapsed_time_str}",
+                print(f"; time spent on chunk: {elapsed_time_str}",
                       end=sub_end_str)
                 if total_size is not None:
                     if chunk_ctr == 1:
@@ -468,6 +468,7 @@ with create_empty_database(DATABASE_FILE_NAME,
                              log_work=LOG_WORK)
     else:
         assert TEST_TYPE is None, f"invalid TEST_TYPE: {TEST_TYPE}"
+        start_time = time.time()
         _, listing = htmllistparse.fetch_listing(BABEL_COMPENDIA_URL)
         files_info = {list_entry.name: list_entry.size
                       for list_entry in listing}
@@ -477,8 +478,11 @@ with create_empty_database(DATABASE_FILE_NAME,
                                 key=lambda li: 0 if li == TAXON_FILE else 1)
         print(f"ingesting compendia files at: {BABEL_COMPENDIA_URL}")
         for file_name in sorted_listing:
+            cur_time = time.time()
+            elapsed_time_str = convert_seconds(cur_time - start_time)
             print(f"ingesting file: {file_name} "
-                  f"size: {files_info[file_name]} bytes")
+                  f"size: {files_info[file_name]} bytes; "
+                  f"elapsed: {elapsed_time_str}")
             ingest_jsonl_url(BABEL_COMPENDIA_URL +
                              file_name,
                              conn=conn,
