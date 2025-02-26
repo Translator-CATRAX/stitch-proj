@@ -7,10 +7,10 @@
 # Empirical testing indicates that this script, on an MBP on M1 Max
 # (ARM64) running MacOS Sonoma and running CPython 3.12, can ingest
 # about 10,000 rows of JSON-lines (from the Babel Compendia files)
-# per second. Since there are an estimated 760 million rows overall
+# per second. Since there are an estimated 482 million rows overall
 # in Babel (very rough estimate based on row character count sizes
 # in OrganismTaxon only!), this script should be able to complete
-# in about 24 hours, assuming that all SELECTs are using indexes
+# in less than 24 hours, assuming that all SELECTs are using indexes
 # as was intended (use of indexes needs to be empirically verified).
 
 # # How to run the Babel ingest
