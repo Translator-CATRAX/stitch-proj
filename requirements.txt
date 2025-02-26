@@ -1,0 +1,8 @@
+htmllistparse==0.6.1
+bmt==1.4.4
+pandas==2.2.3
+mypy==1.15.0
+pandas-stubs==2.2.3.241126
+
+
+
