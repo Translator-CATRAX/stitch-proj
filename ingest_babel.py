@@ -477,7 +477,8 @@ with create_empty_database(DATABASE_FILE_NAME,
                                 key=lambda li: 0 if li == TAXON_FILE else 1)
         print(f"ingesting compendia files at: {BABEL_COMPENDIA_URL}")
         for file_name in sorted_listing:
-            print(f"ingesting file: {file_name} size: {files_info[file_name]}")
+            print(f"ingesting file: {file_name} "
+                  f"size: {files_info[file_name]} bytes")
             ingest_jsonl_url(BABEL_COMPENDIA_URL +
                              file_name,
                              conn=conn,
