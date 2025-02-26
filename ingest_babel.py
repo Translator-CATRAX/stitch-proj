@@ -250,14 +250,11 @@ def ingest_nodenorm_jsonl_chunk(chunk: pd.core.frame.DataFrame,
         # Use an INNER JOIN with the temporary table instead of an IN clause
         query = (
             "SELECT identifiers.curie, identifiers.id "
-            "FROM cliques "
-            "INNER JOIN identifiers ON identifiers.id = "
-            "cliques.primary_identifier_id "
-            "INNER JOIN temp_taxa ON identifiers.curie = temp_taxa.curie "
-            "WHERE cliques.type_id = ?"
+            "FROM identifiers "
+            "INNER JOIN temp_taxa ON identifiers.curie = temp_taxa.curie"
         )
 
-        rows = conn.execute(query, (organism_taxon_category_id,)).fetchall()
+        rows = conn.execute(query).fetchall()
 
         # Optionally, drop the temporary table if you want to free up resources
         # immediately
