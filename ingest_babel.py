@@ -238,15 +238,6 @@ def ingest_nodenorm_jsonl_chunk(chunk: pd.core.frame.DataFrame,
                                                                       for taxon
                                                                       in taxa))
 
-        # Get the organism_taxon_category_id
-        try:
-            organism_taxon_category_id = conn.execute(
-                "SELECT id FROM types WHERE curie = ?",
-                (TAXON_TYPE,)
-            ).fetchone()[0]
-        except TypeError:
-            raise ValueError(f"biolink category {TAXON_TYPE} not in database")
-
         # Use an INNER JOIN with the temporary table instead of an IN clause
         query = (
             "SELECT identifiers.curie, identifiers.id "
