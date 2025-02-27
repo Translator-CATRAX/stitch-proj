@@ -418,9 +418,10 @@ def ingest_jsonl_url(url: str,
         chunk_ctr += 1
 
 
-def create_deferred_indices(conn: sqlite3.Connection,
-                            log_work: bool = False):
-    work_plan = (('identifiers_descriptions', 'description_id'),
+def create_indices(conn: sqlite3.Connection,
+                   log_work: bool = False):
+    work_plan = (('cliques',                  'type_id'),
+                 ('identifiers_descriptions', 'description_id'),
                  ('identifiers_descriptions', 'identifier_id'),
                  ('identifiers_cliques',      'identifier_id'),
                  ('identifiers_cliques',      'clique_id'),
@@ -436,7 +437,7 @@ with create_empty_database(DATABASE_FILE_NAME,
     ingest_biolink_categories(get_biolink_categories(LOG_WORK),
                               conn,
                               LOG_WORK)
-    create_index('cliques', 'type_id', conn, LOG_WORK)
+    create_indices(conn, LOG_WORK)
 
     if TEST_TYPE == 1:
         print(f"ingesting file: {TEST_FILE}")
@@ -480,4 +481,3 @@ with create_empty_database(DATABASE_FILE_NAME,
                              total_size=files_info[file_name],
                              insrt_missing_taxa=True)
 
-    create_deferred_indices(conn, LOG_WORK)
