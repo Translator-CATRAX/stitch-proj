@@ -33,6 +33,7 @@ import os
 import pandas as pd
 # import pprint
 import sqlite3
+# import sys
 import time
 
 
@@ -44,11 +45,12 @@ TAXON_FILE = TAXON_NAME + '.txt'
 TAXON_TYPE = BIOLINK_PREFIX + TAXON_NAME
 SECS_PER_MIN = 60
 SECS_PER_HOUR = 3600
-
+# PRINT_DDL = sys.stderr  # set to sys.stderr to print DDL to standard error
+PRINT_DDL = False
 BABEL_COMPENDIA_URL = \
     'https://stars.renci.org/var/babel_outputs/2025jan23/compendia/'
 
-TEST_TYPE = None
+TEST_TYPE = 1
 TEST_FILE = "test-tiny.jsonl"
 LOG_WORK = True
 
@@ -57,11 +59,14 @@ def create_index(table: str,
                  col: str,
                  conn: sqlite3.Connection,
                  log_work: bool = False):
-    conn.execute('CREATE INDEX '
-                 f'idx_{table}_{col} '
-                 f'ON {table} ({col});')
+    statement = 'CREATE INDEX ' +\
+        f'idx_{table}_{col} ' +\
+        f'ON {table} ({col});'
+    conn.execute(statement)
     if log_work:
         print(f"creating index on column \"{col}\" in table \"{table}\"")
+    if PRINT_DDL:
+        print(statement, file=PRINT_DDL)
 
 
 def create_empty_database(database_file_name: str,
@@ -136,6 +141,8 @@ def create_empty_database(database_file_name: str,
         cur.execute(statement)
         if log_work:
             print(f"creating table: \"{table_name}\"")
+        if PRINT_DDL:
+            print(statement, file=PRINT_DDL)
 
     return conn
 
@@ -421,6 +428,7 @@ def ingest_jsonl_url(url: str,
 def create_indices(conn: sqlite3.Connection,
                    log_work: bool = False):
     work_plan = (('cliques',                  'type_id'),
+                 ('cliques',                  'primary_identifier_id'),
                  ('identifiers_descriptions', 'description_id'),
                  ('identifiers_descriptions', 'identifier_id'),
                  ('identifiers_cliques',      'identifier_id'),
