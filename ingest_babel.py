@@ -20,7 +20,7 @@
 # - `source venv/bin/activate`
 # - `python3.12 -u ingest_babel.py > ingest_babel.log 2>&1`
 # - `ctrl-X D` (to exit the screen session)
-# - `tail -f ingest_babel.log` (so you can watch progress)
+# - `tail -f ingest_babel.log` (so you can watch the progress)
 # - In another terminal session, watch memory usage using `top`
 
 # Thank you to Gaurav Vaidya for helpful information about Babel!
@@ -398,7 +398,7 @@ def ingest_jsonl_url(url: str,
                 sub_end_str = "" if total_size is not None else "\n"
                 elapsed_time = (time.time() - start_time)
                 elapsed_time_str = convert_seconds(elapsed_time)
-                print(f"; time spent on chunk: {elapsed_time_str}",
+                print(f"; time spent on URL: {elapsed_time_str}",
                       end=sub_end_str)
                 if total_size is not None:
                     if chunk_ctr == 1:
