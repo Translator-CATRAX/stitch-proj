@@ -386,6 +386,7 @@ def convert_seconds(seconds: float) -> str:
 
 def ingest_jsonl_url(url: str,
                      conn: sqlite3.Connection,
+                     chunk_size: int,
                      log_work: bool = False,
                      total_size: int = None,
                      insrt_missing_taxa: bool = False):
@@ -448,6 +449,7 @@ def create_indices(conn: sqlite3.Connection,
 
 def do_ingest(babel_compendia_url: str,
               database_file_name: str,
+              chunk_size: int,
               test_type: int = None,
               test_file: str = None,
               log_work: bool = False,
@@ -465,6 +467,7 @@ def do_ingest(babel_compendia_url: str,
             print(f"ingesting file: {test_file}")
             ingest_jsonl_url(test_file,
                              conn=conn,
+                             chunk_size=chunk_size,
                              log_work=log_work,
                              insrt_missing_taxa=True)
         elif test_type == 2:
@@ -475,9 +478,9 @@ def do_ingest(babel_compendia_url: str,
                                 'Polypeptide',
                                 'PhenotypicFeature'):
                 print(f"ingesting file: {file_prefix}")
-                ingest_jsonl_url(babel_compendia_url +
-                                 file_prefix + ".txt",
+                ingest_jsonl_url(babel_compendia_url + file_prefix + ".txt",
                                  conn=conn,
+                                 chunk_size=chunk_size,
                                  log_work=log_work)
         else:
             assert test_type is None, f"invalid test_type: {test_type}"
@@ -499,6 +502,7 @@ def do_ingest(babel_compendia_url: str,
                 ingest_jsonl_url(babel_compendia_url +
                                  file_name,
                                  conn=conn,
+                                 chunk_size=chunk_size,
                                  log_work=log_work,
                                  total_size=files_info[file_name],
                                  insrt_missing_taxa=True)
@@ -510,6 +514,7 @@ def do_ingest(babel_compendia_url: str,
 
 do_ingest(BABEL_COMPENDIA_URL,
           DATABASE_FILE_NAME,
+          CHUNK_SIZE,
           TEST_TYPE,
           TEST_FILE,
           LOG_WORK)
