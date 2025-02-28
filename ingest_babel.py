@@ -28,6 +28,7 @@
 import bmt
 import datetime
 import htmllistparse
+import io
 import math
 import numpy as np
 import os
@@ -46,8 +47,6 @@ TAXON_FILE = TAXON_NAME + '.txt'
 TAXON_TYPE = BIOLINK_PREFIX + TAXON_NAME
 SECS_PER_MIN = 60
 SECS_PER_HOUR = 3600
-# PRINT_DDL = sys.stderr  # set to sys.stderr to print DDL to standard error
-PRINT_DDL = False
 BABEL_COMPENDIA_URL = \
     'https://stars.renci.org/var/babel_outputs/2025jan23/compendia/'
 
@@ -64,19 +63,22 @@ def cur_datetime_local() -> datetime.datetime:
 def create_index(table: str,
                  col: str,
                  conn: sqlite3.Connection,
-                 log_work: bool = False):
+                 log_work: bool = False,
+                 print_ddl: io.TextIOBase = None):
     statement = 'CREATE INDEX ' +\
         f'idx_{table}_{col} ' +\
         f'ON {table} ({col});'
     conn.execute(statement)
     if log_work:
         print(f"creating index on column \"{col}\" in table \"{table}\"")
-    if PRINT_DDL:
-        print(statement, file=PRINT_DDL)
+    if print_ddl is not None:
+        print(statement, file=print_ddl)
 
 
 def create_empty_database(database_file_name: str,
-                          log_work: bool = False) -> sqlite3.Connection:
+                          log_work: bool = False,
+                          print_ddl: io.TextIOBase = None) -> \
+                          sqlite3.Connection:
     if os.path.exists(database_file_name):
         os.remove(database_file_name)
     conn = sqlite3.connect(database_file_name)
@@ -147,8 +149,8 @@ def create_empty_database(database_file_name: str,
         cur.execute(statement)
         if log_work:
             print(f"creating table: \"{table_name}\"")
-        if PRINT_DDL:
-            print(statement, file=PRINT_DDL)
+        if print_ddl is not None:
+            print(statement, file=print_ddl)
 
     return conn
 
@@ -429,7 +431,8 @@ def ingest_jsonl_url(url: str,
 
 
 def create_indices(conn: sqlite3.Connection,
-                   log_work: bool = False):
+                   log_work: bool = False,
+                   print_ddl: io.TextIOBase = None):
     work_plan = (('cliques',                  'type_id'),
                  ('cliques',                  'primary_identifier_id'),
                  ('identifiers_descriptions', 'description_id'),
@@ -440,60 +443,73 @@ def create_indices(conn: sqlite3.Connection,
                  ('identifiers_taxa',         'taxa_identifier_id'))
 
     for table, col in work_plan:
-        create_index(table, col, conn, log_work)
+        create_index(table, col, conn, log_work, print_ddl)
 
 
-start_time_sec = time.time()
-date_time_local = cur_datetime_local().isoformat()
-print(f"Starting database ingest at: {date_time_local}")
-with create_empty_database(DATABASE_FILE_NAME,
-                           LOG_WORK) as conn:
-    ingest_biolink_categories(get_biolink_categories(LOG_WORK),
-                              conn,
-                              LOG_WORK)
-    create_indices(conn, LOG_WORK)
-    if TEST_TYPE == 1:
-        print(f"ingesting file: {TEST_FILE}")
-        ingest_jsonl_url(TEST_FILE,
-                         conn=conn,
-                         log_work=LOG_WORK,
-                         insrt_missing_taxa=True)
-    elif TEST_TYPE == 2:
-        # after ingesting Biolink categories, need to ingest OrganismTaxon
-        # first!
-        for file_prefix in ('OrganismTaxon',
-                            'ComplexMolecularMixture',
-                            'Polypeptide',
-                            'PhenotypicFeature'):
-            print(f"ingesting file: {file_prefix}")
-            ingest_jsonl_url(BABEL_COMPENDIA_URL +
-                             file_prefix + ".txt",
+def do_ingest(babel_compendia_url: str,
+              database_file_name: str,
+              test_type: int = None,
+              test_file: str = None,
+              log_work: bool = False,
+              print_ddl: io.TextIOBase = None):
+    start_time_sec = time.time()
+    date_time_local = cur_datetime_local().isoformat()
+    print(f"Starting database ingest at: {date_time_local}")
+    with create_empty_database(database_file_name,
+                               log_work=log_work) as conn:
+        ingest_biolink_categories(get_biolink_categories(log_work),
+                                  conn,
+                                  log_work)
+        create_indices(conn, log_work)
+        if test_type == 1:
+            print(f"ingesting file: {test_file}")
+            ingest_jsonl_url(test_file,
                              conn=conn,
-                             log_work=LOG_WORK)
-    else:
-        assert TEST_TYPE is None, f"invalid TEST_TYPE: {TEST_TYPE}"
-        start_time = time.time()
-        _, listing = htmllistparse.fetch_listing(BABEL_COMPENDIA_URL)
-        files_info = {list_entry.name: list_entry.size
-                      for list_entry in listing}
-        pruned_listing = tuple(li for li in files_info.keys()
-                               if li.endswith('.txt'))
-        sorted_listing = sorted(pruned_listing,
-                                key=lambda li: 0 if li == TAXON_FILE else 1)
-        print(f"ingesting compendia files at: {BABEL_COMPENDIA_URL}")
-        for file_name in sorted_listing:
-            cur_time = time.time()
-            elapsed_time_str = convert_seconds(cur_time - start_time)
-            print(f"ingesting file: {file_name} "
-                  f"size: {files_info[file_name]} bytes; "
-                  f"elapsed: {elapsed_time_str}")
-            ingest_jsonl_url(BABEL_COMPENDIA_URL +
-                             file_name,
-                             conn=conn,
-                             log_work=LOG_WORK,
-                             total_size=files_info[file_name],
+                             log_work=log_work,
                              insrt_missing_taxa=True)
-date_time_local = cur_datetime_local().isoformat()
-print(f"Finished database ingest at: {date_time_local}")
-elapsed_time_str = convert_seconds(time.time() - start_time_sec)
-print(f"Elapsed time for Babel ingest: {elapsed_time_str} (HHH:MM::SS)")
+        elif test_type == 2:
+            # after ingesting Biolink categories, need to ingest OrganismTaxon
+            # first!
+            for file_prefix in ('OrganismTaxon',
+                                'ComplexMolecularMixture',
+                                'Polypeptide',
+                                'PhenotypicFeature'):
+                print(f"ingesting file: {file_prefix}")
+                ingest_jsonl_url(babel_compendia_url +
+                                 file_prefix + ".txt",
+                                 conn=conn,
+                                 log_work=log_work)
+        else:
+            assert test_type is None, f"invalid test_type: {test_type}"
+            start_time = time.time()
+            _, listing = htmllistparse.fetch_listing(babel_compendia_url)
+            files_info = {list_entry.name: list_entry.size
+                          for list_entry in listing}
+            pruned_listing = tuple(li for li in files_info.keys()
+                                   if li.endswith('.txt'))
+            sorted_listing = sorted(pruned_listing,
+                                    key=lambda i: 0 if i == TAXON_FILE else 1)
+            print(f"ingesting compendia files at: {babel_compendia_url}")
+            for file_name in sorted_listing:
+                cur_time = time.time()
+                elapsed_time_str = convert_seconds(cur_time - start_time)
+                print(f"ingesting file: {file_name} "
+                      f"size: {files_info[file_name]} bytes; "
+                      f"elapsed: {elapsed_time_str}")
+                ingest_jsonl_url(babel_compendia_url +
+                                 file_name,
+                                 conn=conn,
+                                 log_work=log_work,
+                                 total_size=files_info[file_name],
+                                 insrt_missing_taxa=True)
+    date_time_local = cur_datetime_local().isoformat()
+    print(f"Finished database ingest at: {date_time_local}")
+    elapsed_time_str = convert_seconds(time.time() - start_time_sec)
+    print(f"Elapsed time for Babel ingest: {elapsed_time_str} (HHH:MM::SS)")
+
+
+do_ingest(BABEL_COMPENDIA_URL,
+          DATABASE_FILE_NAME,
+          TEST_TYPE,
+          TEST_FILE,
+          LOG_WORK)
