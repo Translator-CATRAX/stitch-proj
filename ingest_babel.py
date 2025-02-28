@@ -26,6 +26,7 @@
 # Thank you to Gaurav Vaidya for helpful information about Babel!
 
 import bmt
+import datetime
 import htmllistparse
 import math
 import numpy as np
@@ -53,6 +54,11 @@ BABEL_COMPENDIA_URL = \
 TEST_TYPE = 1
 TEST_FILE = "test-tiny.jsonl"
 LOG_WORK = True
+
+
+# this function does not return microseconds
+def cur_datetime_local() -> datetime.datetime:
+    return datetime.datetime.now().astimezone().replace(microsecond=0)
 
 
 def create_index(table: str,
@@ -148,10 +154,7 @@ def create_empty_database(database_file_name: str,
 
 
 def nan_to_none(o):
-    if np.isnan(o):
-        return None
-    else:
-        return o
+    return o if not np.isnan(o) else None
 
 
 def first_label(group_df: pd.DataFrame):
@@ -376,7 +379,7 @@ def convert_seconds(seconds: float) -> str:
     hours: int = int(seconds // SECS_PER_HOUR)
     minutes: int = int((seconds % SECS_PER_HOUR) // SECS_PER_MIN)
     remaining_seconds: float = seconds % SECS_PER_MIN
-    return f"{hours:04d}:{minutes:02d}:{remaining_seconds:02.0f}"
+    return f"{hours:03d}:{minutes:02d}:{remaining_seconds:02.0f}"
 
 
 def ingest_jsonl_url(url: str,
@@ -440,13 +443,15 @@ def create_indices(conn: sqlite3.Connection,
         create_index(table, col, conn, log_work)
 
 
+start_time_sec = time.time()
+date_time_local = cur_datetime_local().isoformat()
+print(f"Starting database ingest at: {date_time_local}")
 with create_empty_database(DATABASE_FILE_NAME,
                            LOG_WORK) as conn:
     ingest_biolink_categories(get_biolink_categories(LOG_WORK),
                               conn,
                               LOG_WORK)
     create_indices(conn, LOG_WORK)
-
     if TEST_TYPE == 1:
         print(f"ingesting file: {TEST_FILE}")
         ingest_jsonl_url(TEST_FILE,
@@ -488,4 +493,7 @@ with create_empty_database(DATABASE_FILE_NAME,
                              log_work=LOG_WORK,
                              total_size=files_info[file_name],
                              insrt_missing_taxa=True)
-
+date_time_local = cur_datetime_local().isoformat()
+print(f"Finished database ingest at: {date_time_local}")
+elapsed_time_str = convert_seconds(time.time() - start_time_sec)
+print(f"Elapsed time for Babel ingest: {elapsed_time_str} (HHH:MM::SS)")
