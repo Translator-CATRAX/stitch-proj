@@ -472,7 +472,7 @@ def do_ingest(babel_compendia_url: str,
         create_indices(conn, log_work)
         if test_type == 1:
             if test_file is None:
-                raise ValueError("test_file cannot be None")            
+                raise ValueError("test_file cannot be None")
             print(f"ingesting file: {test_file}")
             ingest_jsonl_url(test_file,
                              conn=conn,
