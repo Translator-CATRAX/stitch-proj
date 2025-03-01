@@ -37,6 +37,7 @@ import pandas as pd
 import sqlite3
 # import sys
 import time
+from typing import Optional
 
 
 DATABASE_FILE_NAME = 'babel.sqlite'
@@ -64,7 +65,7 @@ def create_index(table: str,
                  col: str,
                  conn: sqlite3.Connection,
                  log_work: bool = False,
-                 print_ddl: io.TextIOBase = None):
+                 print_ddl: Optional[io.TextIOBase] = None):
     statement = 'CREATE INDEX ' +\
         f'idx_{table}_{col} ' +\
         f'ON {table} ({col});'
@@ -77,7 +78,7 @@ def create_index(table: str,
 
 def create_empty_database(database_file_name: str,
                           log_work: bool = False,
-                          print_ddl: io.TextIOBase = None) -> \
+                          print_ddl: Optional[io.TextIOBase] = None) -> \
                           sqlite3.Connection:
     if os.path.exists(database_file_name):
         os.remove(database_file_name)
@@ -388,7 +389,7 @@ def ingest_jsonl_url(url: str,
                      conn: sqlite3.Connection,
                      chunk_size: int,
                      log_work: bool = False,
-                     total_size: int = None,
+                     total_size: Optional[int] = None,
                      insrt_missing_taxa: bool = False):
     if log_work:
         chunk_ctr = 1
@@ -433,7 +434,7 @@ def ingest_jsonl_url(url: str,
 
 def create_indices(conn: sqlite3.Connection,
                    log_work: bool = False,
-                   print_ddl: io.TextIOBase = None):
+                   print_ddl: Optional[io.TextIOBase] = None):
     work_plan = (('cliques',                  'type_id'),
                  ('cliques',                  'primary_identifier_id'),
                  ('identifiers_descriptions', 'description_id'),
@@ -447,13 +448,19 @@ def create_indices(conn: sqlite3.Connection,
         create_index(table, col, conn, log_work, print_ddl)
 
 
+TEST_2_COMPENDIA = ('OrganismTaxon',
+                    'ComplexMolecularMixture',
+                    'Polypeptide',
+                    'PhenotypicFeature')
+
+
 def do_ingest(babel_compendia_url: str,
               database_file_name: str,
               chunk_size: int,
-              test_type: int = None,
-              test_file: str = None,
+              test_type: Optional[int] = None,
+              test_file: Optional[str] = None,
               log_work: bool = False,
-              print_ddl: io.TextIOBase = None):
+              print_ddl: Optional[io.TextIOBase] = None):
     start_time_sec = time.time()
     date_time_local = cur_datetime_local().isoformat()
     print(f"Starting database ingest at: {date_time_local}")
@@ -464,6 +471,8 @@ def do_ingest(babel_compendia_url: str,
                                   log_work)
         create_indices(conn, log_work)
         if test_type == 1:
+            if test_file is None:
+                raise ValueError("test_file cannot be None")            
             print(f"ingesting file: {test_file}")
             ingest_jsonl_url(test_file,
                              conn=conn,
@@ -473,10 +482,7 @@ def do_ingest(babel_compendia_url: str,
         elif test_type == 2:
             # after ingesting Biolink categories, need to ingest OrganismTaxon
             # first!
-            for file_prefix in ('OrganismTaxon',
-                                'ComplexMolecularMixture',
-                                'Polypeptide',
-                                'PhenotypicFeature'):
+            for file_prefix in TEST_2_COMPENDIA:
                 print(f"ingesting file: {file_prefix}")
                 ingest_jsonl_url(babel_compendia_url + file_prefix + ".txt",
                                  conn=conn,
