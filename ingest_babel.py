@@ -29,6 +29,7 @@ import bmt
 import datetime
 import htmllistparse
 import io
+import json
 import math
 import numpy as np
 import os
@@ -374,8 +375,8 @@ def ingest_biolink_categories(biolink_categories: tuple[str],
 
 
 def byte_count_df(df: pd.core.frame.DataFrame) -> int:
-    return len(df.to_json(orient='records',
-                          lines=True).encode('utf-8'))
+    return len(json.dumps(df.to_dict(orient='records'))) + \
+        df.shape[0]
 
 
 def convert_seconds(seconds: float) -> str:
