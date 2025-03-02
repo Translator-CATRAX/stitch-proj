@@ -2,10 +2,10 @@
 Some tools for building a Translator BigKG (experimental!) 
 
 # Requirements
-CPython 3.12
-So far, only tested on MacOS Sonoma on ARM64
+- CPython 3.12
+- Tested on Ubuntu 24.04 (on x86_64) and MacOS 14.6.1 (on ARM64)
 
-# Ubuntu/ARM64 notes
+# Ubuntu notes
 - Make sure to install Ubuntu package `python3.12-venv`
 
 # How to run the Babel ingest
@@ -17,3 +17,9 @@ So far, only tested on MacOS Sonoma on ARM64
 - `ctrl-X D` (to exit the screen session)
 - `tail -f ingest_babel.log` (so you can watch progress)
 - In another terminal session, watch memory usage using `top`
+
+# Running the mypy checks:
+
+```
+mypy --ignore-missing-imports ingest_babel.py
+```
