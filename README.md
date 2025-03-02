@@ -4,6 +4,7 @@ Some tools for building a Translator BigKG (experimental!)
 # Requirements
 - CPython 3.12
 - Tested on Ubuntu 24.04 (on x86_64) and MacOS 14.6.1 (on ARM64)
+- Currently, at least 128 GiB of system memory (but see issue #1)
 
 # Ubuntu notes
 - Make sure to install Ubuntu package `python3.12-venv`
