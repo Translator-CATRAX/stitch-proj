@@ -41,20 +41,8 @@ import time
 from typing import Optional
 
 
-DATABASE_FILE_NAME = 'babel.sqlite'
-CHUNK_SIZE = 100000
-BIOLINK_PREFIX = 'biolink:'
-TAXON_NAME = 'OrganismTaxon'
-TAXON_FILE = TAXON_NAME + '.txt'
-TAXON_TYPE = BIOLINK_PREFIX + TAXON_NAME
-SECS_PER_MIN = 60
-SECS_PER_HOUR = 3600
 BABEL_COMPENDIA_URL = \
     'https://stars.renci.org/var/babel_outputs/2025jan23/compendia/'
-
-TEST_TYPE = 1
-TEST_FILE = "test-tiny.jsonl"
-LOG_WORK = True
 
 
 # this function does not return microseconds
@@ -379,6 +367,9 @@ def byte_count_df(df: pd.core.frame.DataFrame) -> int:
         df.shape[0]
 
 
+SECS_PER_MIN = 60
+SECS_PER_HOUR = 3600
+
 def convert_seconds(seconds: float) -> str:
     hours: int = int(seconds // SECS_PER_HOUR)
     minutes: int = int((seconds % SECS_PER_HOUR) // SECS_PER_MIN)
@@ -396,7 +387,7 @@ def ingest_jsonl_url(url: str,
         chunk_ctr = 1
     for chunk in pd.read_json(url,
                               lines=True,
-                              chunksize=CHUNK_SIZE):
+                              chunksize=chunk_size):
         try:
             end_str = "" if log_work else "\n"
             print(f"  Loading chunk {chunk_ctr}", end=end_str)
@@ -453,7 +444,7 @@ TEST_2_COMPENDIA = ('OrganismTaxon',
                     'ComplexMolecularMixture',
                     'Polypeptide',
                     'PhenotypicFeature')
-
+TAXON_FILE = 'OrganismTaxon.txt'
 
 def do_ingest(babel_compendia_url: str,
               database_file_name: str,
@@ -518,6 +509,12 @@ def do_ingest(babel_compendia_url: str,
     elapsed_time_str = convert_seconds(time.time() - start_time_sec)
     print(f"Elapsed time for Babel ingest: {elapsed_time_str} (HHH:MM::SS)")
 
+
+DATABASE_FILE_NAME = 'babel.sqlite'
+CHUNK_SIZE = 100000
+LOG_WORK = True
+TEST_TYPE = 1
+TEST_FILE = "test-tiny.jsonl"
 
 do_ingest(BABEL_COMPENDIA_URL,
           DATABASE_FILE_NAME,
