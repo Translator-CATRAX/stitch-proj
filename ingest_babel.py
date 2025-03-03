@@ -41,10 +41,6 @@ import time
 from typing import Optional
 
 
-BABEL_COMPENDIA_URL = \
-    'https://stars.renci.org/var/babel_outputs/2025jan23/compendia/'
-
-
 # this function does not return microseconds
 def cur_datetime_local() -> datetime.datetime:
     return datetime.datetime.now().astimezone().replace(microsecond=0)
@@ -515,6 +511,8 @@ CHUNK_SIZE = 100000
 LOG_WORK = True
 TEST_TYPE = 1
 TEST_FILE = "test-tiny.jsonl"
+BABEL_COMPENDIA_URL = \
+    'https://stars.renci.org/var/babel_outputs/2025jan23/compendia/'
 
 do_ingest(BABEL_COMPENDIA_URL,
           DATABASE_FILE_NAME,
