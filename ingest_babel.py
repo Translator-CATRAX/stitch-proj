@@ -442,13 +442,13 @@ TEST_2_COMPENDIA = ('OrganismTaxon',
                     'PhenotypicFeature')
 TAXON_FILE = 'OrganismTaxon.txt'
 
-def do_ingest(babel_compendia_url: str,
-              database_file_name: str,
-              chunk_size: int,
-              test_type: Optional[int] = None,
-              test_file: Optional[str] = None,
-              log_work: bool = False,
-              print_ddl: Optional[io.TextIOBase] = None):
+def ingest_babel(babel_compendia_url: str,
+                 database_file_name: str,
+                 chunk_size: int,
+                 test_type: Optional[int] = None,
+                 test_file: Optional[str] = None,
+                 log_work: bool = False,
+                 print_ddl: Optional[io.TextIOBase] = None):
     start_time_sec = time.time()
     date_time_local = cur_datetime_local().isoformat()
     print(f"Starting database ingest at: {date_time_local}")
@@ -514,9 +514,9 @@ TEST_FILE = "test-tiny.jsonl"
 BABEL_COMPENDIA_URL = \
     'https://stars.renci.org/var/babel_outputs/2025jan23/compendia/'
 
-do_ingest(BABEL_COMPENDIA_URL,
-          DATABASE_FILE_NAME,
-          CHUNK_SIZE,
-          TEST_TYPE,
-          TEST_FILE,
-          LOG_WORK)
+ingest_babel(BABEL_COMPENDIA_URL,
+             DATABASE_FILE_NAME,
+             CHUNK_SIZE,
+             TEST_TYPE,
+             TEST_FILE,
+             LOG_WORK)
