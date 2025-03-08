@@ -141,6 +141,19 @@ def create_empty_database(database_file_name: str,
     return conn
 
 
+def get_database(database_file_name: str,
+                 log_work: bool = False,
+                 from_scratch: bool = True,
+                 print_ddl: Optional[io.TextIOBase] = None) -> \
+                 sqlite3.Connection:
+    if from_scratch:
+        return create_empty_database(database_file_name,
+                                     log_work,
+                                     print_ddl)
+    else:
+        return sqlite3.connect(database_file_name)
+
+
 def nan_to_none(o):
     return o if not np.isnan(o) else None
 
@@ -227,7 +240,7 @@ def ingest_nodenorm_jsonl_chunk(chunk: pd.core.frame.DataFrame,
                                                           name=None))
 
     taxa = tuple({taxon for taxon_list in curies_df.taxa.tolist()
-                  for taxon in taxon_list})
+                      for taxon in (taxon_list if taxon_list is not None else [])})
 
     if taxa:
 
@@ -284,7 +297,7 @@ def ingest_nodenorm_jsonl_chunk(chunk: pd.core.frame.DataFrame,
                               for idx, row
                               in chunk.iterrows()
                               for subidx, ident_struct
-                              in enumerate(row.iloc[2])
+                              in enumerate(row.loc['identifiers'])
                               if subidx == 0]
 
     data_to_insert_cliques = tuple(
@@ -445,6 +458,7 @@ TAXON_FILE = 'OrganismTaxon.txt'
 def ingest_babel(babel_compendia_url: str,
                  database_file_name: str,
                  chunk_size: int,
+                 from_scratch: bool = True,
                  test_type: Optional[int] = None,
                  test_file: Optional[str] = None,
                  log_work: bool = False,
@@ -452,12 +466,15 @@ def ingest_babel(babel_compendia_url: str,
     start_time_sec = time.time()
     date_time_local = cur_datetime_local().isoformat()
     print(f"Starting database ingest at: {date_time_local}")
-    with create_empty_database(database_file_name,
-                               log_work=log_work) as conn:
-        ingest_biolink_categories(get_biolink_categories(log_work),
-                                  conn,
-                                  log_work)
-        create_indices(conn, log_work)
+    with get_database(database_file_name,
+                      log_work=log_work,
+                      from_scratch=from_scratch) as conn:
+        if from_scratch:
+            ingest_biolink_categories(get_biolink_categories(log_work),
+                                      conn,
+                                      log_work)
+            create_indices(conn, log_work)
+            
         if test_type == 1:
             if test_file is None:
                 raise ValueError("test_file cannot be None")
@@ -513,10 +530,12 @@ TEST_TYPE = 1
 TEST_FILE = "test-tiny.jsonl"
 BABEL_COMPENDIA_URL = \
     'https://stars.renci.org/var/babel_outputs/2025jan23/compendia/'
+FROM_SCRATCH = True
 
 ingest_babel(BABEL_COMPENDIA_URL,
              DATABASE_FILE_NAME,
              CHUNK_SIZE,
+             FROM_SCRATCH,
              TEST_TYPE,
              TEST_FILE,
              LOG_WORK)
