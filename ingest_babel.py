@@ -461,8 +461,8 @@ def prune_files(file_list: list[htmllistparse.htmllistparse.FileEntry]) ->\
     for file_entry in file_list:
         file_name = file_entry.name
         if '.txt' in file_name:
-            if file_name.endswith('.txt.00'):
-                file_name_prefix = file_name[0:file_name.find('.txt.00')]
+            if file_name.endswith(FILE_NAME_SUFFIX_START_NUMBERED):
+                file_name_prefix = file_name[0:file_name.find(FILE_NAME_SUFFIX_START_NUMBERED)]
                 use_names.remove(file_name_prefix + '.txt')
             use_names.append(file_name)
         else:
