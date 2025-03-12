@@ -1,5 +1,5 @@
 # stitch
-Some tools for building a Translator BigKG (experimental!) 
+Some tools for building a Translator KG (experimental! not yet finished!) 
 
 # Requirements
 - CPython 3.12, available in your path as `python3.12`
@@ -30,7 +30,7 @@ Some tools for building a Translator BigKG (experimental!)
 - In another terminal session, watch memory usage using `top`
 
 # Running the mypy checks:
-
+These checks should be run before any commit to `ingest_babel.py`:
 ```
 mypy --ignore-missing-imports ingest_babel.py
 ```
