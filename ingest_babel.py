@@ -34,9 +34,9 @@ import math
 import numpy as np
 import os
 import pandas as pd
-import pprint
+# import pprint
 import sqlite3
-# import sys
+import sys
 import time
 from typing import Optional
 
@@ -462,14 +462,18 @@ FILE_NAME_SUFFIX_START_NUMBERED = '.txt.00'
 
 def prune_files(file_list: list[htmllistparse.htmllistparse.FileEntry]) ->\
         list[htmllistparse.htmllistparse.FileEntry]:
-    use_names = []
+    use_names: list[str] = []
     map_names = {fe.name: fe for fe in file_list}
     for file_entry in file_list:
         file_name = file_entry.name
-        if file_name.endswith('.txt.00'):
-            file_name_prefix = file_name[0:file_name.find('.txt.00')]
-            use_names.remove(file_name_prefix + '.txt')
-        use_names.append(file_name)
+        if '.txt' in file_name:
+            if file_name.endswith('.txt.00'):
+                file_name_prefix = file_name[0:file_name.find('.txt.00')]
+                use_names.remove(file_name_prefix + '.txt')
+            use_names.append(file_name)
+        else:
+            print(f"Warning: unrecognized file name {file_name}",
+                  file=sys.stderr)
     return [map_names[file_name] for file_name in use_names]
                                          
     
