@@ -34,7 +34,7 @@ import math
 import numpy as np
 import os
 import pandas as pd
-# import pprint
+import pprint
 import sqlite3
 # import sys
 import time
@@ -90,6 +90,7 @@ def create_empty_database(database_file_name: str,
          primary_identifier_id INTEGER NOT NULL,
          ic REAL,
          type_id INTEGER NOT NULL,
+         preferred_name TEXT NOT NULL,
          FOREIGN KEY(primary_identifier_id) REFERENCES identifiers(id),
          FOREIGN KEY(type_id) REFERENCES types(id));
          '''),
@@ -303,13 +304,14 @@ def ingest_nodenorm_jsonl_chunk(chunk: pd.core.frame.DataFrame,
     data_to_insert_cliques = tuple(
         (clique['primary_curie'],
          nan_to_none(clique['ic']),
-         biolink_curie_to_pkid[clique['type']])
+         biolink_curie_to_pkid[clique['type']],
+         clique['preferred_name'])
         for _, clique in chunk.iterrows())
 
     clique_pkids = tuple(
         cursor.execute('INSERT INTO cliques '
-                       '(primary_identifier_id, ic, type_id) '
-                       'VALUES (?, ?, ?) '
+                       '(primary_identifier_id, ic, type_id, preferred_name) '
+                       'VALUES (?, ?, ?, ?) '
                        'RETURNING id;',
                        clique_data).fetchone()[0]
         for clique_data in data_to_insert_cliques)
@@ -455,6 +457,22 @@ TEST_2_COMPENDIA = ('OrganismTaxon',
                     'PhenotypicFeature')
 TAXON_FILE = 'OrganismTaxon.txt'
 
+MAX_FILE_SIZE_BEFORE_SPLIT_BYTES = 10000000000
+FILE_NAME_SUFFIX_START_NUMBERED = '.txt.00'
+
+def prune_files(file_list: list[htmllistparse.htmllistparse.FileEntry]) ->\
+        list[htmllistparse.htmllistparse.FileEntry]:
+    use_names = []
+    map_names = {fe.name: fe for fe in file_list}
+    for file_entry in file_list:
+        file_name = file_entry.name
+        if file_name.endswith('.txt.00'):
+            file_name_prefix = file_name[0:file_name.find('.txt.00')]
+            use_names.remove(file_name_prefix + '.txt')
+        use_names.append(file_name)
+    return [map_names[file_name] for file_name in use_names]
+                                         
+    
 def ingest_babel(babel_compendia_url: str,
                  database_file_name: str,
                  chunk_size: int,
@@ -462,6 +480,7 @@ def ingest_babel(babel_compendia_url: str,
                  test_type: Optional[int] = None,
                  test_file: Optional[str] = None,
                  log_work: bool = False,
+                 dry_run: bool = False,
                  print_ddl: Optional[io.TextIOBase] = None):
     start_time_sec = time.time()
     date_time_local = cur_datetime_local().isoformat()
@@ -496,27 +515,28 @@ def ingest_babel(babel_compendia_url: str,
         else:
             assert test_type is None, f"invalid test_type: {test_type}"
             start_time = time.time()
+            listing: list[htmllistparse.htmllistparse.FileEntry]
             _, listing = htmllistparse.fetch_listing(babel_compendia_url)
-            files_info = {list_entry.name: list_entry.size
-                          for list_entry in listing}
-            pruned_listing = tuple(li for li in files_info.keys()
-                                   if li.endswith('.txt'))
-            sorted_listing = sorted(pruned_listing,
-                                    key=lambda i: 0 if i == TAXON_FILE else 1)
+            pruned_files = prune_files(listing)
+            sorted_files = sorted(pruned_files,
+                                  key=lambda i: 0 if i.name == TAXON_FILE else 1)
             print(f"ingesting compendia files at: {babel_compendia_url}")
-            for file_name in sorted_listing:
+            for file_entry in sorted_files:
+                file_name = file_entry.name
+                file_size = file_entry.size
                 cur_time = time.time()
                 elapsed_time_str = convert_seconds(cur_time - start_time)
-                print(f"ingesting file: {file_name} "
-                      f"size: {files_info[file_name]} bytes; "
-                      f"elapsed: {elapsed_time_str}")
-                ingest_jsonl_url(babel_compendia_url +
-                                 file_name,
-                                 conn=conn,
-                                 chunk_size=chunk_size,
-                                 log_work=log_work,
-                                 total_size=files_info[file_name],
-                                 insrt_missing_taxa=True)
+                print(f"at elapsed time: {elapsed_time_str}; "
+                      f"starting ingest of file: {file_name}; "
+                      f"file size: {file_size} bytes")
+                if not dry_run:
+                    ingest_jsonl_url(babel_compendia_url +
+                                     file_name,
+                                     conn=conn,
+                                     chunk_size=chunk_size,
+                                     log_work=log_work,
+                                     total_size=file_size,
+                                     insrt_missing_taxa=True)
     date_time_local = cur_datetime_local().isoformat()
     print(f"Finished database ingest at: {date_time_local}")
     elapsed_time_str = convert_seconds(time.time() - start_time_sec)
@@ -538,4 +558,5 @@ ingest_babel(BABEL_COMPENDIA_URL,
              FROM_SCRATCH,
              TEST_TYPE,
              TEST_FILE,
-             LOG_WORK)
+             LOG_WORK,
+             dry_run=True)
