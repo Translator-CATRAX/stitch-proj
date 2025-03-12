@@ -34,3 +34,8 @@ Some tools for building a Translator BigKG (experimental!)
 ```
 mypy --ignore-missing-imports ingest_babel.py
 ```
+
+# Schema
+
+![stitch Babel sqlite3 database schema](schema.png)
+
