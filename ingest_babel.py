@@ -485,12 +485,13 @@ def ingest_babel(babel_compendia_url: str,
     print(f"Starting database ingest at: {date_time_local}")
     with get_database(database_file_name,
                       log_work=log_work,
-                      from_scratch=from_scratch) as conn:
+                      from_scratch=from_scratch,
+                      print_ddl=print_ddl) as conn:
         if from_scratch:
             ingest_biolink_categories(get_biolink_categories(log_work),
                                       conn,
                                       log_work)
-            create_indices(conn, log_work)
+            create_indices(conn, log_work, print_ddl=print_ddl)
             
         if test_type == 1:
             if test_file is None:
