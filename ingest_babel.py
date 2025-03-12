@@ -559,4 +559,4 @@ ingest_babel(BABEL_COMPENDIA_URL,
              TEST_TYPE,
              TEST_FILE,
              LOG_WORK,
-             dry_run=True)
+             dry_run=False)
