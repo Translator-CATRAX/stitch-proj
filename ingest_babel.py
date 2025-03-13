@@ -382,14 +382,22 @@ def convert_seconds(seconds: float) -> str:
     return f"{hours:03d}:{minutes:02d}:{remaining_seconds:02.0f}"
 
 
+ROWS_PER_ANALYZE = 1000000
+ROWS_PER_VACUUM = 20 * ROWS_PER_ANALYZE  # left operand must be integer > 0
+
 def ingest_jsonl_url(url: str,
                      conn: sqlite3.Connection,
                      chunk_size: int,
                      log_work: bool = False,
                      total_size: Optional[int] = None,
-                     insrt_missing_taxa: bool = False):
+                     insrt_missing_taxa: bool = False,
+                     global_chunk_count_start: int = 0) -> int:
     if log_work:
         chunk_ctr = 1
+    chunks_per_analyze = math.ceil(ROWS_PER_ANALYZE / chunk_size)
+    chunks_per_vacuum = math.ceil(ROWS_PER_VACUUM / chunk_size)
+    if chunks_per_vacuum % chunks_per_analyze != 0:
+        raise ValueError("ROWS_PER_VACUUM / ROWS_PER_ANALYZE must be integer")
     for chunk in pd.read_json(url,
                               lines=True,
                               chunksize=chunk_size):
@@ -400,16 +408,20 @@ def ingest_jsonl_url(url: str,
             conn.execute("BEGIN TRANSACTION;")
             if log_work and chunk_ctr == 1:
                 start_time = time.time()
+                chunk_start_time = start_time
+            else:
+                chunk_start_time = time.time()
             ingest_nodenorm_jsonl_chunk(chunk,
                                         conn,
                                         insrt_missing_taxa=insrt_missing_taxa)
             conn.commit()
-
             if log_work:
                 sub_end_str = "" if total_size is not None else "\n"
-                elapsed_time = (time.time() - start_time)
+                chunk_end_time = time.time()
+                elapsed_time = (chunk_end_time - start_time)
                 elapsed_time_str = convert_seconds(elapsed_time)
-                print(f"; time spent on URL: {elapsed_time_str}",
+                chunk_elapsed_time_str = convert_seconds(chunk_end_time - chunk_start_time)
+                print(f"; time spent on URL: {elapsed_time_str}; on chunk: {chunk_elapsed_time_str}",
                       end=sub_end_str)
                 if total_size is not None:
                     if chunk_ctr == 1:
@@ -421,12 +433,29 @@ def ingest_jsonl_url(url: str,
                     time_to_complete_str = convert_seconds(time_to_complete)
                     print(f"; {pct_complete:0.2f}% complete"
                           f"; time to complete: {time_to_complete_str}")
+            if (chunk_ctr + global_chunk_count_start) % chunks_per_analyze == 0:
+                if log_work:
+                    analyze_start_time = time.time()
+                conn.execute("ANALYZE")
+                if log_work:
+                    analyze_end_time = time.time()
+                    analyze_elapsed_time = convert_seconds(analyze_end_time - analyze_start_time)
+                    print(f"running ANALYZE took: {analyze_elapsed_time} (HHH:MM::SS)")
+                if (chunk_ctr + global_chunk_count_start) % chunks_per_vacuum == 0:
+                    if log_work:
+                        vacuum_start_time = time.time()
+                    conn.execute("VACUUM")
+                    if log_work:
+                        vacuum_end_time = time.time()
+                        vacuum_elapsed_time = convert_seconds(vacuum_end_time - vacuum_start_time)
+                        print(f"running VACUUM took: {vacuum_elapsed_time} (HHH:MM::SS)")
         except Exception as e:
             conn.rollback()
             raise e
         finally:
             conn.execute("PRAGMA synchronous = FULL;")
         chunk_ctr += 1
+    return chunk_ctr + global_chunk_count_start
 
 
 def create_indices(conn: sqlite3.Connection,
@@ -493,24 +522,29 @@ def ingest_babel(babel_compendia_url: str,
                                       log_work)
             create_indices(conn, log_work, print_ddl=print_ddl)
             
+        global_chunk_count = 0
         if test_type == 1:
             if test_file is None:
                 raise ValueError("test_file cannot be None")
             print(f"ingesting file: {test_file}")
-            ingest_jsonl_url(test_file,
-                             conn=conn,
-                             chunk_size=chunk_size,
-                             log_work=log_work,
-                             insrt_missing_taxa=True)
+            global_chunk_count = \
+                ingest_jsonl_url(test_file,
+                                 conn=conn,
+                                 chunk_size=chunk_size,
+                                 log_work=log_work,
+                                 insrt_missing_taxa=True,
+                                 global_chunk_count_start=global_chunk_count)
         elif test_type == 2:
             # after ingesting Biolink categories, need to ingest OrganismTaxon
             # first!
             for file_prefix in TEST_2_COMPENDIA:
                 print(f"ingesting file: {file_prefix}")
-                ingest_jsonl_url(babel_compendia_url + file_prefix + ".txt",
-                                 conn=conn,
-                                 chunk_size=chunk_size,
-                                 log_work=log_work)
+                global_chunk_count = \
+                    ingest_jsonl_url(babel_compendia_url + file_prefix + ".txt",
+                                     conn=conn,
+                                     chunk_size=chunk_size,
+                                     log_work=log_work,
+                                     global_chunk_count_start=global_chunk_count)
         else:
             assert test_type is None, f"invalid test_type: {test_type}"
             start_time = time.time()
@@ -529,15 +563,28 @@ def ingest_babel(babel_compendia_url: str,
                       f"starting ingest of file: {file_name}; "
                       f"file size: {file_size} bytes")
                 if not dry_run:
-                    ingest_jsonl_url(babel_compendia_url +
-                                     file_name,
-                                     conn=conn,
-                                     chunk_size=chunk_size,
-                                     log_work=log_work,
-                                     total_size=file_size,
-                                     insrt_missing_taxa=True)
+                    global_chunk_count = \
+                        ingest_jsonl_url(babel_compendia_url +
+                                         file_name,
+                                         conn=conn,
+                                         chunk_size=chunk_size,
+                                         log_work=log_work,
+                                         total_size=file_size,
+                                         insrt_missing_taxa=True,
+                                         global_chunk_count_start=global_chunk_count)
+        if log_work:
+            analyze_vacuum_start_time = time.time()
+        conn.execute("ANALYZE")
+        conn.execute("VACUUM")
+        if log_work:
+            analyze_vacuum_end_time = time.time()
+            analyze_vacuum_elapsed_time = convert_seconds(analyze_vacuum_end_time -
+                                                          analyze_vacuum_start_time)
+            print("running ANALYZE and VACUUM took: "
+                  f"{analyze_vacuum_elapsed_time} (HHH:MM::SS)")
     date_time_local = cur_datetime_local().isoformat()
     print(f"Finished database ingest at: {date_time_local}")
+    print(f"Total number of chunks inserted: {global_chunk_count}")
     elapsed_time_str = convert_seconds(time.time() - start_time_sec)
     print(f"Elapsed time for Babel ingest: {elapsed_time_str} (HHH:MM::SS)")
 
