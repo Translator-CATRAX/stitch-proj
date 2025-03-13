@@ -33,7 +33,7 @@ import pandas as pd
 import sqlite3
 import sys
 import time
-from typing import Optional
+from typing import Optional, IO
 
 DEFAULT_BABEL_COMPENDIA_URL = \
     'https://stars.renci.org/var/babel_outputs/2025jan23/compendia/'
@@ -107,20 +107,20 @@ def create_index(table: str,
                  col: str,
                  conn: sqlite3.Connection,
                  log_work: bool = False,
-                 print_ddl: Optional[io.TextIOBase] = None):
+                 print_ddl_file_obj: IO[str] | None = None):
     statement = 'CREATE INDEX ' +\
         f'idx_{table}_{col} ' +\
         f'ON {table} ({col});'
     conn.execute(statement)
     if log_work:
         print(f"creating index on column \"{col}\" in table \"{table}\"")
-    if print_ddl is not None:
-        print(statement, file=print_ddl)
+    if print_ddl_file_obj is not None:
+        print(statement, file=print_ddl_file_obj)
 
 
 def create_empty_database(database_file_name: str,
                           log_work: bool = False,
-                          print_ddl: Optional[io.TextIOBase] = None) -> \
+                          print_ddl_file_obj: IO[str] | None = None) -> \
                           sqlite3.Connection:
     if os.path.exists(database_file_name):
         os.remove(database_file_name)
@@ -193,8 +193,8 @@ def create_empty_database(database_file_name: str,
         cur.execute(statement)
         if log_work:
             print(f"creating table: \"{table_name}\"")
-        if print_ddl is not None:
-            print(statement, file=print_ddl)
+        if print_ddl_file_obj is not None:
+            print(statement, file=print_ddl_file_obj)
 
     return conn
 
@@ -202,12 +202,12 @@ def create_empty_database(database_file_name: str,
 def get_database(database_file_name: str,
                  log_work: bool = False,
                  from_scratch: bool = True,
-                 print_ddl: Optional[io.TextIOBase] = None) -> \
+                 print_ddl_file_obj: IO[str] | None = None) -> \
                  sqlite3.Connection:
     if from_scratch:
         return create_empty_database(database_file_name,
                                      log_work,
-                                     print_ddl)
+                                     print_ddl_file_obj)
     else:
         return sqlite3.connect(database_file_name)
 
@@ -518,7 +518,7 @@ def ingest_jsonl_url(url: str,
 
 def create_indices(conn: sqlite3.Connection,
                    log_work: bool = False,
-                   print_ddl: Optional[io.TextIOBase] = None):
+                   print_ddl_file_obj: IO[str] | None = None):
     work_plan = (('cliques',                  'type_id'),
                  ('cliques',                  'primary_identifier_id'),
                  ('identifiers_descriptions', 'description_id'),
@@ -529,7 +529,7 @@ def create_indices(conn: sqlite3.Connection,
                  ('identifiers_taxa',         'taxa_identifier_id'))
 
     for table, col in work_plan:
-        create_index(table, col, conn, log_work, print_ddl)
+        create_index(table, col, conn, log_work, print_ddl_file_obj)
 
 
 TEST_2_COMPENDIA = ('OrganismTaxon.txt',
@@ -570,10 +570,11 @@ def ingest_babel(babel_compendia_url: str,
                  dry_run: bool,
                  print_ddl: bool):
 
+    print_ddl_file_obj: IO[str] | None
     if print_ddl:
-        print_ddl = sys.stderr
+        print_ddl_file_obj = sys.stderr
     else:
-        print_ddl = None
+        print_ddl_file_obj = None
     log_work = not quiet
     from_scratch = not use_existing_db
     listing: list[htmllistparse.FileEntry]
@@ -590,7 +591,7 @@ def ingest_babel(babel_compendia_url: str,
     with get_database(database_file_name,
                       log_work=log_work,
                       from_scratch=from_scratch,
-                      print_ddl=print_ddl) as conn:
+                      print_ddl_file_obj=print_ddl_file_obj) as conn:
         conn.execute("PRAGMA synchronous = OFF;")
         conn.execute("PRAGMA journal_mode = WAL;")
         conn.execute("PRAGMA wal_autocheckpoint = 1000;")
@@ -599,7 +600,7 @@ def ingest_babel(babel_compendia_url: str,
             ingest_biolink_categories(get_biolink_categories(log_work),
                                       conn,
                                       log_work)
-            create_indices(conn, log_work, print_ddl=print_ddl)
+            create_indices(conn, log_work, print_ddl_file_obj=print_ddl_file_obj)
             
         global_chunk_count = 0
         if test_type == 1:
