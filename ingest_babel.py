@@ -392,8 +392,7 @@ def ingest_jsonl_url(url: str,
                      total_size: Optional[int] = None,
                      insrt_missing_taxa: bool = False,
                      global_chunk_count_start: int = 0) -> int:
-    if log_work:
-        chunk_ctr = 1
+    chunk_ctr = 1
     chunks_per_analyze = math.ceil(ROWS_PER_ANALYZE / chunk_size)
     chunks_per_vacuum = math.ceil(ROWS_PER_VACUUM / chunk_size)
     if chunks_per_vacuum % chunks_per_analyze != 0:
