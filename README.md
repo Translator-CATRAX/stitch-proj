@@ -36,6 +36,6 @@ mypy --ignore-missing-imports ingest_babel.py
 ```
 
 # Schema
-
+This schema diagram was generated using DbVisualizer Free version 24.3.3.
 ![stitch Babel sqlite3 database schema](schema.png)
 
