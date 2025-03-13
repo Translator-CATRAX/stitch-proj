@@ -404,7 +404,8 @@ def ingest_jsonl_url(url: str,
         try:
             end_str = "" if log_work else "\n"
             print(f"  Loading chunk {chunk_ctr}", end=end_str)
-            conn.execute("PRAGMA synchronous = OFF;")
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA synchronous=OFF;")
             conn.execute("BEGIN TRANSACTION;")
             if log_work and chunk_ctr == 1:
                 start_time = time.time()
