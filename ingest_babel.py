@@ -352,7 +352,6 @@ def ingest_biolink_categories(biolink_categories: tuple[str],
                               log_work: bool = False):
     try:
         # Faster writes, but less safe
-        conn.execute("PRAGMA synchronous = OFF;")
         conn.execute("BEGIN TRANSACTION;")
         cursor = conn.cursor()
         if log_work:
@@ -363,8 +362,6 @@ def ingest_biolink_categories(biolink_categories: tuple[str],
     except Exception as e:
         conn.rollback()
         raise e
-    finally:
-        conn.execute("PRAGMA synchronous = FULL;")
 
 
 def byte_count_df(df: pd.core.frame.DataFrame) -> int:
@@ -404,8 +401,6 @@ def ingest_jsonl_url(url: str,
         try:
             end_str = "" if log_work else "\n"
             print(f"  Loading chunk {chunk_ctr}", end=end_str)
-            conn.execute("PRAGMA journal_mode=WAL;")
-            conn.execute("PRAGMA synchronous=OFF;")
             conn.execute("BEGIN TRANSACTION;")
             if log_work and chunk_ctr == 1:
                 start_time = time.time()
@@ -453,8 +448,7 @@ def ingest_jsonl_url(url: str,
         except Exception as e:
             conn.rollback()
             raise e
-        finally:
-            conn.execute("PRAGMA synchronous = FULL;")
+
     return chunk_ctr + global_chunk_count_start
 
 
@@ -516,6 +510,10 @@ def ingest_babel(babel_compendia_url: str,
                       log_work=log_work,
                       from_scratch=from_scratch,
                       print_ddl=print_ddl) as conn:
+        conn.execute("PRAGMA synchronous = OFF;")
+        conn.execute("PRAGMA journal_mode = WAL;")
+        conn.execute("PRAGMA wal_autocheckpoint = 1000;")
+        conn.execute("PRAGMA auto_vacuum = NONE;")
         if from_scratch:
             ingest_biolink_categories(get_biolink_categories(log_work),
                                       conn,
@@ -574,6 +572,9 @@ def ingest_babel(babel_compendia_url: str,
                                          global_chunk_count_start=global_chunk_count)
         if log_work:
             analyze_vacuum_start_time = time.time()
+        conn.execute("PRAGMA wal_checkpoint(FULL);")
+        conn.execute("PRAGMA journal_mode = DELETE;")
+        conn.execute("PRAGMA auto_vacuum = FULL;")
         conn.execute("ANALYZE")
         conn.execute("VACUUM")
         if log_work:
@@ -592,7 +593,7 @@ def ingest_babel(babel_compendia_url: str,
 DATABASE_FILE_NAME = 'babel.sqlite'
 CHUNK_SIZE = 100000
 LOG_WORK = True
-TEST_TYPE = None
+TEST_TYPE = 2
 TEST_FILE = "test-tiny.jsonl"
 BABEL_COMPENDIA_URL = \
     'https://stars.renci.org/var/babel_outputs/2025jan23/compendia/'
