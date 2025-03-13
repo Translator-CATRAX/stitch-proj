@@ -392,7 +392,7 @@ def ingest_jsonl_url(url: str,
                      total_size: Optional[int] = None,
                      insrt_missing_taxa: bool = False,
                      global_chunk_count_start: int = 0) -> int:
-    chunk_ctr = 1
+    chunk_ctr = 0
     chunks_per_analyze = math.ceil(ROWS_PER_ANALYZE / chunk_size)
     chunks_per_vacuum = math.ceil(ROWS_PER_VACUUM / chunk_size)
     if chunks_per_vacuum % chunks_per_analyze != 0:
@@ -400,6 +400,7 @@ def ingest_jsonl_url(url: str,
     for chunk in pd.read_json(url,
                               lines=True,
                               chunksize=chunk_size):
+        chunk_ctr += 1
         try:
             end_str = "" if log_work else "\n"
             print(f"  Loading chunk {chunk_ctr}", end=end_str)
@@ -420,7 +421,7 @@ def ingest_jsonl_url(url: str,
                 elapsed_time = (chunk_end_time - start_time)
                 elapsed_time_str = convert_seconds(elapsed_time)
                 chunk_elapsed_time_str = convert_seconds(chunk_end_time - chunk_start_time)
-                print(f"; time spent on URL: {elapsed_time_str}; on chunk: {chunk_elapsed_time_str}",
+                print(f"; time spent on URL: {elapsed_time_str}; spent on chunk: {chunk_elapsed_time_str}",
                       end=sub_end_str)
                 if total_size is not None:
                     if chunk_ctr == 1:
@@ -453,7 +454,6 @@ def ingest_jsonl_url(url: str,
             raise e
         finally:
             conn.execute("PRAGMA synchronous = FULL;")
-        chunk_ctr += 1
     return chunk_ctr + global_chunk_count_start
 
 
