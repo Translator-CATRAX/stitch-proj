@@ -19,9 +19,10 @@
 
 # Thank you to Gaurav Vaidya for helpful information about Babel!
 
+import argparse
 import bmt
-import datetime
-import htmllistparse
+from datetime import datetime
+from htmllistparse import htmllistparse
 import io
 import json
 import math
@@ -34,10 +35,72 @@ import sys
 import time
 from typing import Optional
 
+DEFAULT_BABEL_COMPENDIA_URL = \
+    'https://stars.renci.org/var/babel_outputs/2025jan23/compendia/'
+DEFAULT_DATABASE_FILE_NAME = 'babel.sqlite'
+
+DEFAULT_TEST_TYPE = None
+DEFAULT_TEST_FILE = "test-tiny.jsonl"
+DEFAULT_CHUNK_SIZE = 100000
+
+def get_args() -> argparse.Namespace:
+    arg_parser = argparse.ArgumentParser(description='ingest_babel.py: '
+                                         'ingest the Babel compendia '
+                                         ' files into a sqlite3 database')
+    arg_parser.add_argument('--babel-compendia-url',
+                            type=str,
+                            dest='babel_compendia_url',
+                            default=DEFAULT_BABEL_COMPENDIA_URL,
+                            help='the URL of the web page containing an HTML index '
+                            'listing of Babel compendia files')
+    arg_parser.add_argument('--database-file-name',
+                            type=str,
+                            dest='database_file_name',
+                            default=DEFAULT_DATABASE_FILE_NAME,
+                            help='the name of the output sqlite3 database file')
+    arg_parser.add_argument('--chunk-size',
+                            type=int,
+                            dest='chunk_size',
+                            default=DEFAULT_CHUNK_SIZE,
+                            help='the size of a chunk, in rows of JSON-lines')
+    arg_parser.add_argument('--use-existing-db',
+                            dest='use_existing_db',
+                            default=False,
+                            action='store_true',
+                            help='do not ingest any compendia files; '
+                            'just show the work plan (like \"make -n\")')
+    arg_parser.add_argument('--test-type',
+                            type=int,
+                            dest='test_type',
+                            default=DEFAULT_TEST_TYPE,
+                            help='if running a test, specify the test type (1 or 2)')
+    arg_parser.add_argument('--test-file',
+                            type=str,
+                            dest='test_file',
+                            default=DEFAULT_TEST_FILE,
+                            help='the JSON-lines file to be used for testing (test type 1 only)')
+    arg_parser.add_argument('--quiet',
+                            dest='quiet',
+                            default=False,
+                            action='store_true')
+    arg_parser.add_argument('--dry-run',
+                            dest='dry_run',
+                            default=False,
+                            action='store_true',
+                            help='do not ingest any compendia files; '
+                            'just show the work plan (like \"make -n\")')
+    arg_parser.add_argument('--print-ddl',
+                            dest='print_ddl',
+                            default=False,
+                            action='store_true',
+                            help='print out the DDL SQL commands for '
+                            'creating the database to stderr, and then exit')
+    return arg_parser.parse_args()
+
 
 # this function does not return microseconds
-def cur_datetime_local() -> datetime.datetime:
-    return datetime.datetime.now().astimezone().replace(microsecond=0)
+def cur_datetime_local() -> datetime:
+    return datetime.now().astimezone().replace(microsecond=0)
 
 
 def create_index(table: str,
@@ -417,7 +480,8 @@ def ingest_jsonl_url(url: str,
                 elapsed_time = (chunk_end_time - start_time)
                 elapsed_time_str = convert_seconds(elapsed_time)
                 chunk_elapsed_time_str = convert_seconds(chunk_end_time - chunk_start_time)
-                print(f"; time spent on URL: {elapsed_time_str}; spent on chunk: {chunk_elapsed_time_str}",
+                print(f"; time spent on URL: {elapsed_time_str}; "
+                      f"spent on chunk: {chunk_elapsed_time_str}",
                       end=sub_end_str)
                 if total_size is not None:
                     if chunk_ctr == 1:
@@ -468,17 +532,18 @@ def create_indices(conn: sqlite3.Connection,
         create_index(table, col, conn, log_work, print_ddl)
 
 
-TEST_2_COMPENDIA = ('OrganismTaxon',
-                    'ComplexMolecularMixture',
-                    'Polypeptide',
-                    'PhenotypicFeature')
+TEST_2_COMPENDIA = ('OrganismTaxon.txt',
+                    'ComplexMolecularMixture.txt',
+                    'Polypeptide.txt',
+                    'PhenotypicFeature.txt')
 TAXON_FILE = 'OrganismTaxon.txt'
 
 MAX_FILE_SIZE_BEFORE_SPLIT_BYTES = 10000000000
 FILE_NAME_SUFFIX_START_NUMBERED = '.txt.00'
 
-def prune_files(file_list: list[htmllistparse.htmllistparse.FileEntry]) ->\
-        list[htmllistparse.htmllistparse.FileEntry]:
+def prune_files(file_list: list[htmllistparse.FileEntry]) ->\
+        tuple[list[htmllistparse.FileEntry],
+              dict[str, htmllistparse.FileEntry]]:
     use_names: list[str] = []
     map_names = {fe.name: fe for fe in file_list}
     for file_entry in file_list:
@@ -491,21 +556,37 @@ def prune_files(file_list: list[htmllistparse.htmllistparse.FileEntry]) ->\
         else:
             print(f"Warning: unrecognized file name {file_name}",
                   file=sys.stderr)
-    return [map_names[file_name] for file_name in use_names]
+    return [map_names[file_name] for file_name in use_names], \
+        {file_name: map_names[file_name] for file_name in use_names}
                                          
     
 def ingest_babel(babel_compendia_url: str,
                  database_file_name: str,
                  chunk_size: int,
-                 from_scratch: bool = True,
-                 test_type: Optional[int] = None,
-                 test_file: Optional[str] = None,
-                 log_work: bool = False,
-                 dry_run: bool = False,
-                 print_ddl: Optional[io.TextIOBase] = None):
+                 use_existing_db: bool,
+                 test_type: Optional[int],
+                 test_file: Optional[str],
+                 quiet: bool,
+                 dry_run: bool,
+                 print_ddl: bool):
+
+    if print_ddl:
+        print_ddl = sys.stderr
+    else:
+        print_ddl = None
+    log_work = not quiet
+    from_scratch = not use_existing_db
+    listing: list[htmllistparse.FileEntry]
+    _, listing = htmllistparse.fetch_listing(babel_compendia_url)
+    pruned_files, map_names = prune_files(listing)
+    sorted_files = sorted(pruned_files,
+                          key=lambda i: 0 if i.name == TAXON_FILE else 1)
+
     start_time_sec = time.time()
     date_time_local = cur_datetime_local().isoformat()
     print(f"Starting database ingest at: {date_time_local}")
+    if test_type:
+        print(f"Running in test mode; test type: {test_type}")
     with get_database(database_file_name,
                       log_work=log_work,
                       from_scratch=from_scratch,
@@ -535,22 +616,28 @@ def ingest_babel(babel_compendia_url: str,
         elif test_type == 2:
             # after ingesting Biolink categories, need to ingest OrganismTaxon
             # first!
-            for file_prefix in TEST_2_COMPENDIA:
-                print(f"ingesting file: {file_prefix}")
-                global_chunk_count = \
-                    ingest_jsonl_url(babel_compendia_url + file_prefix + ".txt",
-                                     conn=conn,
-                                     chunk_size=chunk_size,
-                                     log_work=log_work,
-                                     global_chunk_count_start=global_chunk_count)
+            start_time = time.time()
+            for file_name in TEST_2_COMPENDIA:
+                file_entry = map_names[file_name]
+                file_size = file_entry.size
+                print(f"ingesting file: {file_name}")
+                cur_time = time.time()
+                elapsed_time_str = convert_seconds(cur_time - start_time)
+                print(f"at elapsed time: {elapsed_time_str}; "
+                      f"starting ingest of file: {file_name}; "
+                      f"file size: {file_size} bytes")
+                if not dry_run:
+                    global_chunk_count = \
+                        ingest_jsonl_url(babel_compendia_url + file_name,
+                                         conn=conn,
+                                         chunk_size=chunk_size,
+                                         log_work=log_work,
+                                         total_size=file_size,
+                                         insrt_missing_taxa=True,
+                                         global_chunk_count_start=global_chunk_count)
         else:
             assert test_type is None, f"invalid test_type: {test_type}"
             start_time = time.time()
-            listing: list[htmllistparse.htmllistparse.FileEntry]
-            _, listing = htmllistparse.fetch_listing(babel_compendia_url)
-            pruned_files = prune_files(listing)
-            sorted_files = sorted(pruned_files,
-                                  key=lambda i: 0 if i.name == TAXON_FILE else 1)
             print(f"ingesting compendia files at: {babel_compendia_url}")
             for file_entry in sorted_files:
                 file_name = file_entry.name
@@ -590,20 +677,12 @@ def ingest_babel(babel_compendia_url: str,
     print(f"Elapsed time for Babel ingest: {elapsed_time_str} (HHH:MM::SS)")
 
 
-DATABASE_FILE_NAME = 'babel.sqlite'
-CHUNK_SIZE = 100000
-LOG_WORK = True
-TEST_TYPE = None
-TEST_FILE = "test-tiny.jsonl"
-BABEL_COMPENDIA_URL = \
-    'https://stars.renci.org/var/babel_outputs/2025jan23/compendia/'
-FROM_SCRATCH = True
+def namespace_to_dict(namespace):
+    return {
+        k: namespace_to_dict(v) if isinstance(v, argparse.Namespace) else v
+        for k, v in vars(namespace).items()
+    }
 
-ingest_babel(BABEL_COMPENDIA_URL,
-             DATABASE_FILE_NAME,
-             CHUNK_SIZE,
-             FROM_SCRATCH,
-             TEST_TYPE,
-             TEST_FILE,
-             LOG_WORK,
-             dry_run=False)
+
+if __name__ == "__main__":
+    ingest_babel(**namespace_to_dict(get_args()))
