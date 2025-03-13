@@ -593,7 +593,7 @@ def ingest_babel(babel_compendia_url: str,
 DATABASE_FILE_NAME = 'babel.sqlite'
 CHUNK_SIZE = 100000
 LOG_WORK = True
-TEST_TYPE = 2
+TEST_TYPE = None
 TEST_FILE = "test-tiny.jsonl"
 BABEL_COMPENDIA_URL = \
     'https://stars.renci.org/var/babel_outputs/2025jan23/compendia/'
