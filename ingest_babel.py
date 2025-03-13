@@ -570,19 +570,19 @@ def ingest_babel(babel_compendia_url: str,
                                          total_size=file_size,
                                          insrt_missing_taxa=True,
                                          global_chunk_count_start=global_chunk_count)
-        if log_work:
-            analyze_vacuum_start_time = time.time()
         conn.execute("PRAGMA wal_checkpoint(FULL);")
         conn.execute("PRAGMA journal_mode = DELETE;")
         conn.execute("PRAGMA auto_vacuum = FULL;")
+        if log_work:
+            final_cleanup_start_time = time.time()
         conn.execute("ANALYZE")
         conn.execute("VACUUM")
         if log_work:
-            analyze_vacuum_end_time = time.time()
-            analyze_vacuum_elapsed_time = convert_seconds(analyze_vacuum_end_time -
-                                                          analyze_vacuum_start_time)
-            print("running ANALYZE and VACUUM took: "
-                  f"{analyze_vacuum_elapsed_time} (HHH:MM::SS)")
+            final_cleanup_end_time = time.time()
+            final_cleanup_elapsed_time = convert_seconds(final_cleanup_end_time -
+                                                         final_cleanup_start_time)
+            print("running ANALYZE and VACUUM (final cleanup) took: "
+                  f"{final_cleanup_elapsed_time} (HHH:MM::SS)")
     date_time_local = cur_datetime_local().isoformat()
     print(f"Finished database ingest at: {date_time_local}")
     print(f"Total number of chunks inserted: {global_chunk_count}")
