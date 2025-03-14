@@ -551,11 +551,9 @@ def create_indices(conn: sqlite3.Connection,
 
 
 TEST_2_COMPENDIA = ('OrganismTaxon.txt',
-                    'umls.txt')
-# TEST_2_COMPENDIA = ('OrganismTaxon.txt',
-#                    'ComplexMolecularMixture.txt',
-#                    'Polypeptide.txt',
-#                    'PhenotypicFeature.txt')
+                    'ComplexMolecularMixture.txt',
+                    'Polypeptide.txt',
+                    'PhenotypicFeature.txt')
 TAXON_FILE = 'OrganismTaxon.txt'
 
 MAX_FILE_SIZE_BEFORE_SPLIT_BYTES = 10000000000
