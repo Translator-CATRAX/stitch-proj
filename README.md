@@ -3,12 +3,57 @@ Some tools for building a Translator KG (experimental! not yet finished!)
 
 # Requirements
 - CPython 3.12, available in your path as `python3.12`
-- Tested on Ubuntu 24.04 (on x86_64) and MacOS 14.6.1 (on ARM64)
+- Ubuntu or Macos
 - At least 32 GiB of system memory
 - At least 150 GiB of free file system storage space
 
-# Ubuntu notes
-- Make sure to install Ubuntu package `python3.12-venv`
+# Systems tested
+
+## AWS 
+- Ubuntu 24.04
+- `c7g.4xlarge` instance (Graviton3 processor), 32 GiB of memory
+- `gp3` root volume (24 GiB)
+- `io1` data volume (200 GiB); mounted with `noatime`
+- The following packages `apt` installed: 
+  - `sqlite3`
+  - `build-essential` 
+  - `gcc` 
+  - `g++` 
+  - `make` 
+  - `libffi-dev` 
+  - `libssl-dev` 
+  - `zlib1g-dev` 
+  - `libbz2-dev` 
+  - `libreadline-dev` 
+  - `libsqlite3-dev` 
+  - `libncursesw5-dev` 
+  - `tk-dev` 
+  - `libgdbm-dev` 
+  - `libnss3-dev` 
+  - `liblzma-dev`
+  - `uuid-dev`
+  - `python3-dev`
+  - `gfortran` 
+  - `libopenblas-dev` 
+  - `liblapack-dev`
+  - `libfreetype6-dev` 
+  - `libpng-dev` 
+  - `libjpeg-dev`
+  - `libtiff-dev` 
+  - `libffi-dev` 
+  - `liblzma-dev`
+  - `pkg-config` 
+  - `cmake`
+  - `python3.12-venv`
+- CPython, Numpy, and Pandas compiled locally using gcc/g++ with the following CFLAGS:
+```-mcpu=neoverse-v1 -mtune=neoverse-v1 -march=armv8.4-a+crypto -O3 -pipe```
+
+## MacOS
+- MacOS 14.6.1
+- Apple M1 Max processor, 64 GiB of memory
+- Apple SSD AP2048R Media SSD (2 TiB)
+- `python3.12` installed via Homebrew
+- `openblas` installed via Homebrew
 
 # Setup
 - `ssh ubuntu@stitch.rtx.ai` (if running in AWS); else just create a new `bash` session
