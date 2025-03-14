@@ -1,4 +1,4 @@
-#!/usr/bin/env bash -x
+#!/usr/bin/env -S bash -x
 
 set -o nounset -o pipefail -o errexit
 
