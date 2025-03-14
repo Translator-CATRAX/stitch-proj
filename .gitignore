@@ -2,3 +2,10 @@
 **/.DS_Store
 *~
 *.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.pstats
+__pycache__/*
+test/*
+tmp/*
+venv/*
