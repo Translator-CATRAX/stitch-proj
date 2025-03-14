@@ -73,6 +73,9 @@ Some tools for building a Translator KG (experimental! not yet finished!)
 - `tail -f ingest-babel.log` (so you can watch progress)
 - In another terminal session, watch memory usage using `top`
 
+After a few days (!), the ingest script should save the database as a file
+`/home/ubuntu/stitch/babel.sqlite`.
+
 # Running the mypy checks:
 These checks should be run before any commit to `ingest_babel.py`:
 ```
