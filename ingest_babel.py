@@ -129,6 +129,12 @@ def create_index(table: str,
         print(statement, file=print_ddl_file_obj)
 
 
+def set_auto_vacuum(conn: sqlite3.Connection,
+                    auto_vacuum_on: bool):
+    switch_str = 'FULL' if auto_vacuum_on else 'NONE'
+    conn.execute(f"PRAGMA auto_vacuum={switch_str};")
+
+
 def create_empty_database(database_file_name: str,
                           log_work: bool = False,
                           print_ddl_file_obj: IO[str] | None = None) -> \
@@ -136,7 +142,7 @@ def create_empty_database(database_file_name: str,
     if os.path.exists(database_file_name):
         os.remove(database_file_name)
     conn = sqlite3.connect(database_file_name)
-    conn.execute("PRAGMA auto_vacuum=NONE;")
+    set_auto_vacuum(conn, False)
     cur = conn.cursor()
     table_creation_statements = (
         ('types',
@@ -221,7 +227,10 @@ def get_database(database_file_name: str,
                                      log_work,
                                      print_ddl_file_obj)
     else:
-        return sqlite3.connect(database_file_name)
+        conn = sqlite3.connect(database_file_name)
+        set_auto_vacuum(conn, False)
+        conn.execute("VACUUM;")
+        return conn
 
 
 def nan_to_none(o):
@@ -708,7 +717,7 @@ def main(babel_compendia_url: str,
                                          glbl_chnk_cnt_start=glbl_chnk_cnt)
         conn.execute("PRAGMA wal_checkpoint(FULL);")
         conn.execute("PRAGMA journal_mode = DELETE;")
-        conn.execute("PRAGMA auto_vacuum = FULL;")
+        set_auto_vacuum(conn, True)
         if log_work:
             final_cleanup_start_time = time.time()
         conn.execute("ANALYZE")
