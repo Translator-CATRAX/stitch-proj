@@ -101,8 +101,8 @@ def get_args() -> argparse.Namespace:
                             action='store_true',
                             help='print out the DDL SQL commands for '
                             'creating the database to stderr, and then exit')
-    arg_parser.add_argument('--tmp-dir',
-                            dest='tmp_dir',
+    arg_parser.add_argument('--temp-dir',
+                            dest='temp_dir',
                             default=None,
                             help='specify an alternate temp directory instead '
                             'of /tmp')
@@ -600,13 +600,13 @@ def main(babel_compendia_url: str,
          quiet: bool,
          dry_run: bool,
          print_ddl: bool,
-         tmp_dir: str):
+         temp_dir: str):
 
-    if tmp_dir is not None:
+    if temp_dir is not None:
         if not quiet:
-            print(f"For Ray and sqlite3, setting temp dir to: {tmp_dir}")
-        os.environ["RAY_TMPDIR"] = tmp_dir
-        os.environ["SQLITE_TMP"] = tmp_dir
+            print(f"For Ray and sqlite3, setting temp dir to: {temp_dir}")
+        os.environ["RAY_TMPDIR"] = temp_dir
+        os.environ["SQLITE_TMP"] = temp_dir
         # The reload is necessary because sqlite3 reads the environment
         # variable at import and there is seemingly no way to change it
         # after that:
