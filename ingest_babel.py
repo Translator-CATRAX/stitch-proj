@@ -130,9 +130,12 @@ def create_index(table: str,
 
 
 def set_auto_vacuum(conn: sqlite3.Connection,
-                    auto_vacuum_on: bool):
+                    auto_vacuum_on: bool,
+                    quiet: bool = False):
     switch_str = 'FULL' if auto_vacuum_on else 'NONE'
     conn.execute(f"PRAGMA auto_vacuum={switch_str};")
+    if not quiet:
+        print(f"setting auto_vacuum to: {switch_str}")
 
 
 def create_empty_database(database_file_name: str,
@@ -464,8 +467,8 @@ def convert_sec(seconds: float) -> str:
     return f"{hours:03d}:{minutes:02d}:{remaining_seconds:02.0f}"
 
 
-ROWS_PER_ANALYZE = 1000000
-ROWS_PER_VACUUM = 20 * ROWS_PER_ANALYZE  # left operand must be integer > 0
+ROWS_PER_ANALYZE = 20000000
+ROWS_PER_VACUUM = 10 * ROWS_PER_ANALYZE  # left operand must be integer > 0
 
 
 def ingest_jsonl_url(url: str,
