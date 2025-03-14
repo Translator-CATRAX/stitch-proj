@@ -23,8 +23,8 @@ import argparse
 import bmt
 from datetime import datetime
 from htmllistparse import htmllistparse
-import io
 import json
+import logging
 import math
 import numpy as np
 import os
@@ -32,6 +32,7 @@ import pandas as pd
 # import pprint
 import sqlite3
 import sys
+import swifter # noqa: F401
 import time
 from typing import Optional, IO
 
@@ -42,6 +43,9 @@ DEFAULT_DATABASE_FILE_NAME = 'babel.sqlite'
 DEFAULT_TEST_TYPE = None
 DEFAULT_TEST_FILE = "test-tiny.jsonl"
 DEFAULT_CHUNK_SIZE = 100000
+
+logging.getLogger("ray").setLevel(logging.ERROR)
+
 
 def get_args() -> argparse.Namespace:
     arg_parser = argparse.ArgumentParser(description='ingest_babel.py: '
@@ -276,7 +280,7 @@ def ingest_nodenorm_jsonl_chunk(chunk: pd.core.frame.DataFrame,
     curies_df['pkid'] = tuple(curie_pkids[curie] for curie in curies)
     missing_series = curies_df.pkid.isna()
     missing_df = curies_df.loc[missing_series][['curie', 'label']]
-    missing_df_gb = missing_df.groupby(by='curie')
+    missing_df_gb = missing_df.swifter.progress_bar(False).groupby(by='curie')
     missing_df_dedup = missing_df_gb.apply(first_label,
                                            include_groups=False)
     missing_df_t = tuple(missing_df_dedup.itertuples(index=True,
