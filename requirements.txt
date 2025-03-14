@@ -3,6 +3,7 @@ bmt==1.4.4
 pandas==2.2.3
 mypy==1.15.0
 pandas-stubs==2.2.3.241126
-
+ray==2.43.0
+swifter==1.4.0
 
 
