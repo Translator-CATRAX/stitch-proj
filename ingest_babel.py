@@ -30,9 +30,10 @@ import numpy as np
 import os
 import pandas as pd
 # import pprint
+import ray
 import sqlite3
 import sys
-import swifter # noqa: F401
+import swifter  # noqa: F401
 import time
 from typing import Optional, IO
 
@@ -45,7 +46,7 @@ DEFAULT_TEST_FILE = "test-tiny.jsonl"
 DEFAULT_CHUNK_SIZE = 100000
 
 logging.getLogger("ray").setLevel(logging.ERROR)
-
+ray.init(logging_level=logging.ERROR)
 
 def get_args() -> argparse.Namespace:
     arg_parser = argparse.ArgumentParser(description='ingest_babel.py: '
