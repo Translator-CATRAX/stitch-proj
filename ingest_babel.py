@@ -23,13 +23,13 @@ import argparse
 import bmt
 from datetime import datetime
 from htmllistparse import htmllistparse
+import importlib
 import json
 import logging
 import math
 import numpy as np
 import os
 import pandas as pd
-# import pprint
 import ray
 import sqlite3
 import sys
@@ -44,9 +44,6 @@ DEFAULT_DATABASE_FILE_NAME = 'babel.sqlite'
 DEFAULT_TEST_TYPE = None
 DEFAULT_TEST_FILE = "test-tiny.jsonl"
 DEFAULT_CHUNK_SIZE = 100000
-
-logging.getLogger("ray").setLevel(logging.ERROR)
-ray.init(logging_level=logging.ERROR)
 
 
 def get_args() -> argparse.Namespace:
@@ -104,6 +101,11 @@ def get_args() -> argparse.Namespace:
                             action='store_true',
                             help='print out the DDL SQL commands for '
                             'creating the database to stderr, and then exit')
+    arg_parser.add_argument('--tmp-dir',
+                            dest='tmp_dir',
+                            default=None,
+                            help='specify an alternate temp directory instead '
+                            'of /tmp')
     return arg_parser.parse_args()
 
 
@@ -582,15 +584,37 @@ def prune_files(file_list: list[htmllistparse.FileEntry]) ->\
         {file_name: map_names[file_name] for file_name in use_names}
 
 
-def ingest_babel(babel_compendia_url: str,
-                 database_file_name: str,
-                 chunk_size: int,
-                 use_existing_db: bool,
-                 test_type: Optional[int],
-                 test_file: Optional[str],
-                 quiet: bool,
-                 dry_run: bool,
-                 print_ddl: bool):
+def namespace_to_dict(namespace):
+    return {
+        k: namespace_to_dict(v) if isinstance(v, argparse.Namespace) else v
+        for k, v in vars(namespace).items()
+    }
+
+
+def main(babel_compendia_url: str,
+         database_file_name: str,
+         chunk_size: int,
+         use_existing_db: bool,
+         test_type: Optional[int],
+         test_file: Optional[str],
+         quiet: bool,
+         dry_run: bool,
+         print_ddl: bool,
+         tmp_dir: str):
+
+    if tmp_dir is not None:
+        if not quiet:
+            print(f"For Ray and sqlite3, setting temp dir to: {tmp_dir}")
+        os.environ["RAY_TMPDIR"] = tmp_dir
+        os.environ["SQLITE_TMP"] = tmp_dir
+        # The reload is necessary because sqlite3 reads the environment
+        # variable at import and there is seemingly no way to change it
+        # after that:
+        importlib.reload(sqlite3)
+
+    # initialize Ray after any changes to tmp dir location
+    logging.getLogger("ray").setLevel(logging.ERROR)
+    ray.init(logging_level=logging.ERROR)
 
     print_ddl_file_obj: IO[str] | None
     if print_ddl:
@@ -618,6 +642,7 @@ def ingest_babel(babel_compendia_url: str,
         conn.execute("PRAGMA journal_mode = WAL;")
         conn.execute("PRAGMA wal_autocheckpoint = 1000;")
         conn.execute("PRAGMA auto_vacuum = NONE;")
+
         if from_scratch:
             ingest_biolink_categories(get_biolink_categories(log_work),
                                       conn,
@@ -701,12 +726,5 @@ def ingest_babel(babel_compendia_url: str,
     print(f"Elapsed time for Babel ingest: {elapsed_time_str} (HHH:MM::SS)")
 
 
-def namespace_to_dict(namespace):
-    return {
-        k: namespace_to_dict(v) if isinstance(v, argparse.Namespace) else v
-        for k, v in vars(namespace).items()
-    }
-
-
 if __name__ == "__main__":
-    ingest_babel(**namespace_to_dict(get_args()))
+    main(**namespace_to_dict(get_args()))
