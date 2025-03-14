@@ -56,23 +56,25 @@ Some tools for building a Translator KG (experimental! not yet finished!)
 - `openblas` installed via Homebrew
 
 # Setup
-- `ssh ubuntu@stitch.rtx.ai` (if running in AWS); else just create a new `bash` session
+- `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
 - `git clone https://github.com/Translator-CATRAX/stitch.git`
 - `cd stitch`
 - `python3.12 -m venv venv`
 - `source venv/bin/activate`
 - `pip3 install -r requirements.txt`
 
-# How to run the Babel ingest
-
-- `ssh ubuntu@stitch.rtx.ai` (if running in AWS); else just create a new `bash` session
+# How to run the Babel ingest in AWS
+- `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
 - `cd stitch`
 - `screen`
 - `source venv/bin/activate`
-- `python3.12 -u ingest_babel.py > ingest_babel.log 2>&1`
+- `./run-ingest-aws.sh`
 - `ctrl-X D` (to exit the screen session)
-- `tail -f ingest_babel.log` (so you can watch progress)
+- `tail -f ingest-babel.log` (so you can watch progress)
 - In another terminal session, watch memory usage using `top`
+
+After a few days (!), the ingest script should save the database as a file
+`/home/ubuntu/stitch/babel.sqlite`.
 
 # Running the mypy checks:
 These checks should be run before any commit to `ingest_babel.py`:
