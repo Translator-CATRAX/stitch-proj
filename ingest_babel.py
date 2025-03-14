@@ -136,6 +136,7 @@ def create_empty_database(database_file_name: str,
     if os.path.exists(database_file_name):
         os.remove(database_file_name)
     conn = sqlite3.connect(database_file_name)
+    conn.execute("PRAGMA auto_vacuum=NONE;")
     cur = conn.cursor()
     table_creation_statements = (
         ('types',
@@ -641,7 +642,6 @@ def main(babel_compendia_url: str,
         conn.execute("PRAGMA synchronous = OFF;")
         conn.execute("PRAGMA journal_mode = WAL;")
         conn.execute("PRAGMA wal_autocheckpoint = 1000;")
-        conn.execute("PRAGMA auto_vacuum = NONE;")
 
         if from_scratch:
             ingest_biolink_categories(get_biolink_categories(log_work),
