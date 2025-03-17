@@ -636,7 +636,7 @@ def main(babel_compendia_url: str,
             # variable at import and there is seemingly no way to change it
             # after that:
             importlib.reload(sqlite3)
-        elif sys.platform == "linux" or sys.platform == "linux2":
+        elif sys.platform.startswith('linux'):
             # here, need to restart python
             if not no_exec:
                 subprocess.run([sys.executable] +
