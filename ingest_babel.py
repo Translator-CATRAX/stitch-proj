@@ -32,7 +32,6 @@ import os
 import pandas as pd
 import ray
 import sqlite3
-import subprocess
 import sys
 import swifter  # noqa: F401
 import time
@@ -107,15 +106,6 @@ def get_args() -> argparse.Namespace:
                             default=None,
                             help='specify an alternate temp directory instead '
                             'of /tmp')
-    arg_parser.add_argument('--no-exec',
-                            dest='no_exec',
-                            action='store_true',
-                            help='do not replace the cpython process with another '
-                            'cpython process (via exec() system call); this is '
-                            'used internally by the ingest_babel.py script, which '
-                            'in order to programmatically set the SQLITE_TMPDIR '
-                            'environment variable and have it take effect, must '
-                            'exec() python ingest_babel.py to start a new interpreter.')
     return arg_parser.parse_args()
 
 
@@ -623,27 +613,14 @@ def main(babel_compendia_url: str,
          quiet: bool,
          dry_run: bool,
          print_ddl: bool,
-         temp_dir: str,
-         no_exec: bool):
+         temp_dir: str):
 
     if temp_dir is not None:
         if not quiet:
             print(f"For Ray and sqlite3, setting temp dir to: {temp_dir}")
         os.environ["RAY_TMPDIR"] = temp_dir
-        os.environ["SQLITE_TMP"] = temp_dir
-        if sys.platform == "darwin":
-            # The reload is necessary because sqlite3 reads the environment
-            # variable at import and there is seemingly no way to change it
-            # after that:
-            importlib.reload(sqlite3)
-        elif sys.platform.startswith('linux'):
-            # here, need to restart python
-            if not no_exec:
-                subprocess.run([sys.executable] +
-                               sys.argv + ['--no-exec'],
-                               env=os.environ.copy())
-        else:
-            raise ValueError("this script does not run in Windows")
+        os.environ["SQLITE_TMPDIR"] = temp_dir
+        importlib.reload(sqlite3)
 
     # initialize Ray after any changes to tmp dir location
     logging.getLogger("ray").setLevel(logging.ERROR)
