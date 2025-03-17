@@ -13,7 +13,7 @@ Some tools for building a Translator KG (experimental! not yet finished!)
 - Ubuntu 24.04
 - `c7g.4xlarge` instance (Graviton3 processor), 32 GiB of memory
 - `gp3` root volume (24 GiB)
-- `io1` data volume (200 GiB); mounted with `noatime`
+- `io1` data volume (200 GiB); mounted with `noatime` (standard 3000 IOPS and 125 MiBS)
 - The following packages `apt` installed: 
   - `sqlite3`
   - `build-essential` 
