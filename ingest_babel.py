@@ -640,7 +640,7 @@ def main(babel_compendia_url: str,
             # here, need to restart python
             if not no_exec:
                 subprocess.run([sys.executable] +
-                               (sys.argv + ['--no-exec']),
+                               sys.argv + ['--no-exec'],
                                env=os.environ.copy())
         else:
             raise ValueError("this script does not run in Windows")
