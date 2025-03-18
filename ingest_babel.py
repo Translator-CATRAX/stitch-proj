@@ -539,7 +539,6 @@ def ingest_jsonl_url(url: str,
                     conn.execute("PRAGMA wal_checkpoint(FULL);")
                     conn.execute("PRAGMA journal_mode = DELETE;")
                     conn.execute("VACUUM;")
-                    conn.execute(f"PRAGMA wal_autocheckpoint = {WAL_SIZE};")
                     conn.execute("PRAGMA journal_mode = WAL;")
                     if log_work:
                         vacuum_end_time = time.time()
