@@ -44,6 +44,7 @@ DEFAULT_DATABASE_FILE_NAME = 'babel.sqlite'
 DEFAULT_TEST_TYPE = None
 DEFAULT_TEST_FILE = "test-tiny.jsonl"
 DEFAULT_CHUNK_SIZE = 100000
+WAL_SIZE = 1000
 
 
 def get_args() -> argparse.Namespace:
@@ -524,7 +525,7 @@ def ingest_jsonl_url(url: str,
                chunks_per_analyze == 0:
                 if log_work:
                     analyze_start_time = time.time()
-                conn.execute("ANALYZE")
+                conn.execute("ANALYZE;")
                 if log_work:
                     analyze_end_time = time.time()
                     analyze_elapsed_time = convert_sec(analyze_end_time -
@@ -535,7 +536,11 @@ def ingest_jsonl_url(url: str,
                    chunks_per_vacuum == 0:
                     if log_work:
                         vacuum_start_time = time.time()
-                    conn.execute("VACUUM")
+                    conn.execute("PRAGMA wal_checkpoint(FULL);")
+                    conn.execute("PRAGMA journal_mode = DELETE;")
+                    conn.execute("VACUUM;")
+                    conn.execute(f"PRAGMA wal_autocheckpoint = {WAL_SIZE};")
+                    conn.execute("PRAGMA journal_mode = WAL;")
                     if log_work:
                         vacuum_end_time = time.time()
                         vacuum_elapsed_time = convert_sec(vacuum_end_time -
@@ -604,6 +609,7 @@ def namespace_to_dict(namespace):
     }
 
 
+
 def main(babel_compendia_url: str,
          database_file_name: str,
          chunk_size: int,
@@ -650,8 +656,7 @@ def main(babel_compendia_url: str,
                       print_ddl_file_obj=print_ddl_file_obj) as conn:
         conn.execute("PRAGMA synchronous = OFF;")
         conn.execute("PRAGMA journal_mode = WAL;")
-        conn.execute("PRAGMA wal_autocheckpoint = 1000;")
-
+        conn.execute(f"PRAGMA wal_autocheckpoint = {WAL_SIZE};")
         if from_scratch:
             ingest_biolink_categories(get_biolink_categories(log_work),
                                       conn,
