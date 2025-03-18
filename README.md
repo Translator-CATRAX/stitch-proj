@@ -13,7 +13,7 @@ Some tools for building a Translator KG (experimental! not yet finished!)
 - Ubuntu 24.04
 - `c7g.4xlarge` instance (Graviton3 processor), 32 GiB of memory
 - `gp3` root volume (24 GiB)
-- `io1` data volume (200 GiB); mounted with `noatime`
+- `io1` data volume (200 GiB); mounted with `noatime` (standard 3000 IOPS and 125 MiBS)
 - The following packages `apt` installed: 
   - `sqlite3`
   - `build-essential` 
@@ -49,6 +49,8 @@ Some tools for building a Translator KG (experimental! not yet finished!)
 ```-mcpu=neoverse-v1 -mtune=neoverse-v1 -march=armv8.4-a+crypto -O3 -pipe```
 
 ## MacOS
+For reasons I don't fully understand, `ingest_babel.py` runs quite fast on the M1 Max, compared to
+the Graviton3 processor. I've tested on the following MacOS system:
 - MacOS 14.6.1
 - Apple M1 Max processor, 64 GiB of memory
 - Apple SSD AP2048R Media SSD (2 TiB)
