@@ -34,6 +34,7 @@ import ray
 import sqlite3
 import sys
 import swifter  # noqa: F401
+import tempfile
 import time
 from typing import Optional, IO
 
@@ -625,6 +626,7 @@ def main(babel_compendia_url: str,
             print(f"For Ray and sqlite3, setting temp dir to: {temp_dir}")
         os.environ["RAY_TMPDIR"] = temp_dir
         os.environ["SQLITE_TMPDIR"] = temp_dir
+        tempfile.tempdir = temp_dir
         importlib.reload(sqlite3)
 
     # initialize Ray after any changes to tmp dir location
