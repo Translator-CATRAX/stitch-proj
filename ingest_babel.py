@@ -273,14 +273,21 @@ def ingest_nodenorm_jsonl_chunk(chunk: pd.core.frame.DataFrame,
     curies_and_info = tuple((identif_struct['i'],
                              identif_struct.get('l', None),
                              ci,
-                             identif_struct.get('t', None))
-                            for clique_info in chunk.identifiers.tolist()
-                            for ci, identif_struct in enumerate(clique_info))
+                             identif_struct.get('t', None),
+                             id)
+                            for id, (_, row) in enumerate(chunk.iterrows())
+                            for ci, identif_struct
+                            in enumerate(row['identifiers']))
+
+    # curies_df has four columns: curie, label, cis, and taxa;
+    # each row corresponds to a different identifier in the chunk
     curies_df = pd.DataFrame.from_records(curies_and_info,
                                           columns=('curie',
                                                    'label',
                                                    'cis',
-                                                   'taxa'))
+                                                   'taxa',
+                                                   'chunk_row'))
+
     curies = curies_df.curie.tolist()
 
     # Create a temporary table
@@ -402,9 +409,8 @@ def ingest_nodenorm_jsonl_chunk(chunk: pd.core.frame.DataFrame,
     chunk['clique_pkid'] = clique_pkids
 
     identifiers_cliques_data = tuple(
-        (curies_to_pkids[clique_data['primary_curie']],
-         clique_data['clique_pkid'])
-        for id, clique_data in chunk.iterrows())
+         (row['pkid'], int(chunk.iloc[row['chunk_row']]['clique_pkid']))
+         for id, row in curies_df.iterrows())
 
     cursor.executemany('INSERT INTO identifiers_cliques '
                        '(identifier_id, clique_id) '
@@ -469,7 +475,7 @@ def convert_sec(seconds: float) -> str:
     return f"{hours:03d}:{minutes:02d}:{remaining_seconds:02.0f}"
 
 
-ROWS_PER_ANALYZE = 20000000
+ROWS_PER_ANALYZE = 25000000
 ROWS_PER_VACUUM = 10 * ROWS_PER_ANALYZE  # left operand must be integer > 0
 
 
@@ -607,7 +613,6 @@ def namespace_to_dict(namespace):
         k: namespace_to_dict(v) if isinstance(v, argparse.Namespace) else v
         for k, v in vars(namespace).items()
     }
-
 
 
 def main(babel_compendia_url: str,
