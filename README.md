@@ -5,7 +5,7 @@ Some tools for building a Translator KG (experimental! not yet finished!)
 - CPython 3.12, available in your path as `python3.12`
 - Ubuntu or Macos
 - At least 32 GiB of system memory
-- At least 400 GiB of free file system storage space
+- At least 500 GiB of free file system storage space (400 GiB might be sufficient but I am not certain)
 
 # Systems tested
 
