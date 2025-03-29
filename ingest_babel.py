@@ -392,7 +392,7 @@ def ingest_nodenorm_jsonl_chunk(chunk: pd.core.frame.DataFrame,
                               if subidx == 0]
 
     data_to_insert_cliques = tuple(
-        (clique['primary_curie'],
+        (curies_to_pkids[clique['primary_curie']],
          nan_to_none(clique['ic']),
          biolink_curie_to_pkid[clique['type']],
          clique['preferred_name'])
