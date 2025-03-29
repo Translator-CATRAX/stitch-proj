@@ -88,3 +88,7 @@ mypy --ignore-missing-imports ingest_babel.py
 This schema diagram was generated using DbVisualizer Free version 24.3.3.
 ![stitch Babel sqlite3 database schema](schema.png)
 
+# How to use
+
+1. When you create a connection, make sure to set `PRAGMA foreign_keys = ON;`
+
