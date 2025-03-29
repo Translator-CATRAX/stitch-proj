@@ -75,7 +75,7 @@ the Graviton3 processor. I've tested on the following MacOS system:
 - `tail -f ingest-babel.log` (so you can watch progress)
 - In another terminal session, watch memory usage using `top`
 
-After a few days (!), the ingest script should save the database as a file
+After approximately 60 hours, the ingest script should save the database as a file
 `/home/ubuntu/stitch/babel.sqlite`.
 
 # Running the mypy checks:
