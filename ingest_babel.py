@@ -475,8 +475,8 @@ def convert_sec(seconds: float) -> str:
     return f"{hours:03d}:{minutes:02d}:{remaining_seconds:02.0f}"
 
 
-ROWS_PER_ANALYZE = 25000000
-ROWS_PER_VACUUM = 10 * ROWS_PER_ANALYZE  # left operand must be integer > 0
+ROWS_PER_ANALYZE = 100000000
+ROWS_PER_VACUUM = 100 * ROWS_PER_ANALYZE  # left operand must be integer > 0
 
 
 def ingest_jsonl_url(url: str,
