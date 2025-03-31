@@ -3,9 +3,9 @@ Some tools for building a Translator KG (experimental! not yet finished!)
 
 # Requirements
 - CPython 3.12, available in your path as `python3.12`
-- Ubuntu or Macos
+- Ubuntu or MacOS
 - At least 32 GiB of system memory
-- At least 400 GiB of free file system storage space
+- At least 500 GiB of free file system storage space (400 GiB might be sufficient but I am not certain)
 
 # Systems tested
 
@@ -75,7 +75,7 @@ the Graviton3 processor. I've tested on the following MacOS system:
 - `tail -f ingest-babel.log` (so you can watch progress)
 - In another terminal session, watch memory usage using `top`
 
-After a few days (!), the ingest script should save the database as a file
+After approximately 60 hours, the ingest script should save the database as a file
 `/home/ubuntu/stitch/babel.sqlite`.
 
 # Running the mypy checks:
