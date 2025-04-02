@@ -1,6 +1,9 @@
 # stitch
 Some tools for building a Translator KG (experimental! not yet finished!) 
 
+# Tools
+- `ingest_babel.py`: ingests the Babel concept identifier synonymization database into a sqlite3 database
+
 # Requirements
 - CPython 3.12, available in your path as `python3.12`
 - Ubuntu or MacOS
@@ -79,6 +82,11 @@ After approximately 50 hours, the ingest script should save the database as a fi
 `/home/ubuntu/stitch/babel.sqlite`; as of the January 23, 2025 release of Babel, the
 `babel.sqlite` file produced by this script is 164 GiB.
 
+Note, the `ingest_babel.py` script does not ingest the Babel `conflation` files
+`DrugChemical.txt` and `GeneProtein.txt`; the plan is to ingest these as "edges"
+in the big KG, rather than to conflate gene/protein concept nodes and conflate
+chemical/drug concept nodes.
+
 # Running the mypy checks:
 These checks should be run before any commit to `ingest_babel.py`:
 ```
@@ -88,6 +96,21 @@ mypy --ignore-missing-imports ingest_babel.py
 # Schema
 This schema diagram was generated using DbVisualizer Free version 24.3.3.
 ![stitch Babel sqlite3 database schema](schema.png)
+
+In the `cliques` table, the combination of columns `primary_identifier_id` and
+`type_id` are unique, as confirmed by this SQL query returning no rows:
+```
+sqlite> SELECT primary_identifier_id, type_id, COUNT(*) as count
+   ...> FROM cliques
+   ...> GROUP BY primary_identifier_id, type_id
+   ...> HAVING COUNT(*) > 1 LIMIT 10;
+```
+In contrast, the column `primary_identifier_id` on the `cliques` table by itself
+is not unique; there can be more than one clique with the same
+`primary_identifier_id` and different `type_id` values.  In theory, I should
+probably add a two-column uniqueness constraint to the `cliques` table, but I
+have not yet done so.  See issue 16:
+https://github.com/Translator-CATRAX/stitch/issues/16
 
 # How to use
 
