@@ -1,5 +1,5 @@
 # stitch
-Some tools for building a Translator KG (experimental! not yet finished!) 
+Some tools for building a Translator BigKG (experimental! not yet finished!) 
 
 # Tools
 - `ingest_babel.py`: ingests the Babel concept identifier synonymization database into a sqlite3 database
