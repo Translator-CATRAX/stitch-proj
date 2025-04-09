@@ -8,7 +8,7 @@ Some tools for building a Translator BigKG (experimental! not yet finished!)
 - CPython 3.12, available in your path as `python3.12`
 - Ubuntu or MacOS
 - At least 32 GiB of system memory
-- At least 500 GiB of free file system storage space (400 GiB might be sufficient but I am not certain)
+- At least 500 GiB of free file system storage space (400 GiB might be sufficient, but I am not certain)
 
 # Systems tested
 
@@ -80,7 +80,7 @@ the Graviton3 processor. I've tested on the following MacOS system:
 
 After approximately 50 hours, the ingest script should save the database as a file
 `/home/ubuntu/stitch/babel.sqlite`; as of the January 23, 2025 release of Babel, the
-`babel.sqlite` file produced by this script is 164 GiB.
+`babel.sqlite` file produced by the `ingest_babel.py` script is 164 GiB.
 
 Note, the `ingest_babel.py` script does not ingest the Babel `conflation` files
 `DrugChemical.txt` and `GeneProtein.txt`; the plan is to ingest these as "edges"
