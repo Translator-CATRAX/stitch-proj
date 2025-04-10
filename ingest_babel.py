@@ -5,7 +5,7 @@
 # February 2025
 
 # Empirical testing indicates that this script should be able to complete
-# an ingest of Babel in less than 5 days.
+# an ingest of Babel about 50 hours.
 
 # # How to run the Babel ingest
 # - `ssh ubuntu@stitch.rtx.ai`
