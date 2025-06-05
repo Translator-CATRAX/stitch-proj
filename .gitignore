@@ -5,8 +5,9 @@
 *.sqlite-shm
 *.sqlite-wal
 *.pstats
-__pycache__/*
+**/__pycache__/*
 test/*
 tmp/*
 venv/*
 old/*
+db
