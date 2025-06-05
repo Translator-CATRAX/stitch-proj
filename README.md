@@ -116,3 +116,11 @@ https://github.com/Translator-CATRAX/stitch/issues/16
 
 1. When you create a connection, make sure to set `PRAGMA foreign_keys = ON;`
 
+
+# How to run the test suite
+
+```
+cd stitch
+source venv/bin/activate
+pytest
+```
