@@ -11,3 +11,4 @@ tmp/*
 venv/*
 old/*
 db
+build-*/*
