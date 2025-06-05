@@ -1,5 +1,6 @@
 
 import multiprocessing
+import pprint
 import sqlite3
 import time
 
@@ -63,6 +64,15 @@ def test_map_preferred_curie_to_cliques(readonly_conn: sqlite3.Connection):
 
 
 def test_map_curies_to_preferred_curies(db_filename: str):
+    results = map_curies_to_preferred_curies(db_filename,
+                                             ("MESH:D014867",
+                                              "CHEBI:15377",
+                                              "HP:0001300"),
+                                             None)
+    pprint.pprint(results)
+
+
+def test_map_curies_to_preferred_curies_big(db_filename: str):
     with multiprocessing.Pool(processes=4) as pool:
         curies = get_n_random_curies(db_filename, 1000, pool)
         start = time.time()
