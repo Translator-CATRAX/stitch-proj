@@ -1,0 +1,4 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+lint.select = ["E", "F", "W", "I"]  # E=pycodestyle, F=pyflakes, W=warnings, I=isort
