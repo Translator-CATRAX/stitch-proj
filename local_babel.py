@@ -176,32 +176,3 @@ def get_n_random_curies(db_filename: str,
     return tuple(chainer(mapper(processor, batches)))
 
 
-def main():
-    db_filename = "db/babel-20250123.sqlite"
-    n_cores = 10
-    with multiprocessing.Pool(processes=n_cores) as pool:
-        start_time = time.time()
-        random_curies = get_n_random_curies(db_filename, 100000, pool)
-        end_time = time.time()
-#        print(f"elapsed time for getting random curies: {end_time - start_time}")
-
-    with connect_to_db_read_only(db_filename) as conn:
-        pprint.pprint(map_any_curie_to_cliques(conn.cursor(),
-                                               "MESH:D014867"))
-        pprint.pprint(map_pref_curie_to_synonyms(conn, "CHEBI:15377"))
-        pprint.pprint(map_preferred_curie_to_cliques(conn,
-                                                     "CHEBI:15377"))
-    with multiprocessing.Pool(processes=n_cores) as pool:
-        start_time = time.time()
-        map_curies_to_preferred_curies(db_filename,
-                                       random_curies,
-                                       pool)
-        end_time = time.time()
-    print(f"elapsed time: {end_time - start_time}; "
-          f"number mapped: {len(random_curies)}")
-
-if __name__ == "__main__":
-    main()
-#    pprint.pprint(map_curies_to_preferred_curies(conn, ("MESH:D014867",
-#                                                        "CHEBI:15377",
-#                                                        "HP:0001300")))
