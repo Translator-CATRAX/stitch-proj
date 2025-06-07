@@ -87,11 +87,12 @@ Note, the `ingest_babel.py` script does not ingest the Babel `conflation` files
 in the big KG, rather than to conflate gene/protein concept nodes and conflate
 chemical/drug concept nodes.
 
-# Running the mypy checks:
-These checks should be run before any commit to `ingest_babel.py`:
+# Running the type checks and lint checks:
+These checks should be run before any commit:
 ```
-mypy --ignore-missing-imports ingest_babel.py
+./run-checks.sh
 ```
+which will run type checks (using `mypy`) and lint checks (using `ruff`).
 
 # Schema
 This schema diagram was generated using DbVisualizer Free version 24.3.3.
