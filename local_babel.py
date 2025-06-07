@@ -8,10 +8,8 @@ import math
 import multiprocessing
 import multiprocessing.pool
 import operator
-import pprint
 import random
 import sqlite3
-import time
 from typing import Optional, TypeAlias, TypedDict
 
 # define the type aliases that we need for brevity
