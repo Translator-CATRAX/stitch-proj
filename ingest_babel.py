@@ -20,23 +20,24 @@
 # Thank you to Gaurav Vaidya for helpful information about Babel!
 
 import argparse
-import bmt
-from datetime import datetime
-from htmllistparse import htmllistparse
 import importlib
 import json
 import logging
 import math
-import numpy as np
 import os
-import pandas as pd
-import ray
 import sqlite3
 import sys
-import swifter  # noqa: F401
 import tempfile
 import time
-from typing import Optional, IO
+from datetime import datetime
+from typing import IO, Optional
+
+import bmt
+import numpy as np
+import pandas as pd
+import ray
+import swifter  # noqa: F401
+from htmllistparse import htmllistparse
 
 DEFAULT_BABEL_COMPENDIA_URL = \
     'https://stars.renci.org/var/babel_outputs/2025jan23/compendia/'
