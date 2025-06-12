@@ -92,7 +92,7 @@ These checks should be run before any commit:
 ```
 ./run-checks.sh
 ```
-which will run type checks (using `mypy`) and lint checks (using `ruff`).
+which will run type checks (using `mypy`) and code lint checks (using `ruff`).
 
 # Schema
 This schema diagram was generated using DbVisualizer Free version 24.3.3.
