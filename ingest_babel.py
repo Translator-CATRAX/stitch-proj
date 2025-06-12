@@ -20,7 +20,6 @@
 # Thank you to Gaurav Vaidya for helpful information about Babel!
 
 import argparse
-import importlib
 import json
 import logging
 import math
@@ -41,6 +40,8 @@ from htmllistparse import htmllistparse
 
 DEFAULT_BABEL_COMPENDIA_URL = \
     'https://stars.renci.org/var/babel_outputs/2025jan23/compendia/'
+DEFAULT_BABEL_CONFLATION_URL = \
+    'https://stars.renci.org/var/babel_outputs/2025jan23/conflation/'
 DEFAULT_DATABASE_FILE_NAME = 'babel.sqlite'
 
 DEFAULT_TEST_TYPE = None
@@ -59,6 +60,12 @@ def get_args() -> argparse.Namespace:
                             default=DEFAULT_BABEL_COMPENDIA_URL,
                             help='the URL of the web page containing an HTML '
                             'index listing of Babel compendia files')
+    arg_parser.add_argument('--babel-conflation-url',
+                            type=str,
+                            dest='babel_conflation_url',
+                            default=DEFAULT_BABEL_CONFLATION_URL,
+                            help='the URL of the web page containing an HTML '
+                            'index listing of the Babel conflation files')
     arg_parser.add_argument('--database-file-name',
                             type=str,
                             dest='database_file_name',
@@ -109,6 +116,12 @@ def get_args() -> argparse.Namespace:
                             default=None,
                             help='specify an alternate temp directory instead '
                             'of /tmp')
+    arg_parser.add_argument('--no-exec',
+                            dest='no_exec',
+                            default=False,
+                            action='store_true',
+                            help='this option is not to be directly set by a '
+                            'user; only script sets it internally')
     return arg_parser.parse_args()
 
 
@@ -625,15 +638,20 @@ def main(babel_compendia_url: str,
          quiet: bool,
          dry_run: bool,
          print_ddl: bool,
-         temp_dir: str):
+         temp_dir: str,
+         no_exec: bool):
+
 
     if temp_dir is not None:
-        if not quiet:
-            print(f"For Ray and sqlite3, setting temp dir to: {temp_dir}")
-        os.environ["RAY_TMPDIR"] = temp_dir
         os.environ["SQLITE_TMPDIR"] = temp_dir
+        if not no_exec:
+            python_exe = sys.executable
+            new_args = [python_exe, sys.argv[0], *sys.argv[1:], "--no-exec"]
+            os.execve(python_exe, new_args, os.environ.copy())
+        os.environ["RAY_TMPDIR"] = temp_dir
         tempfile.tempdir = temp_dir
-        importlib.reload(sqlite3)
+        if not quiet:
+            print(f"Setting temp dir to: {temp_dir}")
 
     # initialize Ray after any changes to tmp dir location
     logging.getLogger("ray").setLevel(logging.ERROR)
