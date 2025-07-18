@@ -4,14 +4,18 @@ set -o nounset -o pipefail -o errexit
 run_mypy_cmd="mypy --ignore-missing-imports"
 run_ruff_cmd="ruff check"
 
-echo "Running type checks on local_babel.py"
-${run_mypy_cmd} local_babel.py
+files_to_check=(stitch/local_babel.py
+                stitch/ingest_babel.py
+                tests/test_local_babel.py
+                tests/test_ingest_babel.py)
 
-echo "Running ruff checks on local_babel.py"
-${run_ruff_cmd} local_babel.py
+for file in "${files_to_check[@]}"; do
+    echo "Running ruff checks on file ${file}"
+    ${run_ruff_cmd} ${file}
 
-echo "Running type checks on ingest_babel.py"
-${run_mypy_cmd} ingest_babel.py
+    echo "Running type checks on file ${file}"
+    ${run_mypy_cmd} ${file}
+done
 
-echo "Running ruff checks on ingest_babel.py"
-${run_ruff_cmd} ingest_babel.py
+echo "Running full pytest unit test suite"
+pytest -v

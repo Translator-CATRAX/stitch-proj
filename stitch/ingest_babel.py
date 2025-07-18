@@ -20,6 +20,7 @@
 # Thank you to Gaurav Vaidya for helpful information about Babel!
 
 import argparse
+import ast
 import json
 import logging
 import math
@@ -130,6 +131,21 @@ def cur_datetime_local() -> datetime:
     return datetime.now().astimezone().replace(microsecond=0)
 
 
+def _read_conflation_file_in_chunks(file_path: str, chunk_size: int):
+    chunk = []
+    with open(file_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                parsed_list = ast.literal_eval(line)
+                chunk.append(parsed_list)
+                if len(chunk) >= chunk_size:
+                    yield chunk
+                    chunk = []
+        if chunk:
+            yield chunk
+
+
 def create_index(table: str,
                  col: str,
                  conn: sqlite3.Connection,
@@ -153,6 +169,90 @@ def set_auto_vacuum(conn: sqlite3.Connection,
     if not quiet:
         print(f"setting auto_vacuum to: {switch_str}")
 
+SQL_CREATE_TABLE_TYPES = \
+    '''
+        CREATE TABLE types (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        curie TEXT NOT NULL UNIQUE);
+    '''
+
+SQL_CREATE_TABLE_IDENTIFIERS = \
+    '''
+        CREATE TABLE identifiers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        curie TEXT NOT NULL UNIQUE,
+        label TEXT);
+    '''
+
+SQL_CREATE_TABLE_CLIQUES = \
+    '''
+        CREATE TABLE cliques (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        primary_identifier_id INTEGER NOT NULL,
+        ic REAL,
+        type_id INTEGER NOT NULL,
+        preferred_name TEXT NOT NULL,
+        FOREIGN KEY(primary_identifier_id) REFERENCES identifiers(id),
+        FOREIGN KEY(type_id) REFERENCES types(id));
+    '''
+
+SQL_CREATE_TABLE_DESCRIPTIONS = \
+    '''
+        CREATE TABLE descriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        desc TEXT NOT NULL);
+    '''
+
+SQL_CREATE_TABLE_IDENTIFIERS_DESCRIPTIONS = \
+    '''
+        CREATE TABLE identifiers_descriptions (
+        description_id INTEGER NOT NULL,
+        identifier_id INTEGER NOT NULL,
+        FOREIGN KEY(description_id) REFERENCES descriptions(id),
+        FOREIGN KEY(identifier_id) REFERENCES identifiers(id));
+    '''
+
+SQL_CREATE_TABLE_IDENTIFIERS_CLIQUES = \
+    '''
+        CREATE TABLE identifiers_cliques (
+        identifier_id INTEGER NOT NULL,
+        clique_id INTEGER NOT NULL,
+        FOREIGN KEY(identifier_id) REFERENCES identifiers(id),
+        FOREIGN KEY(clique_id) REFERENCES cliques(id));
+    '''
+
+SQL_CREATE_TABLE_IDENTIFIERS_TAXA = \
+    '''
+        CREATE TABLE identifiers_taxa (
+        identifier_id INTEGER NOT NULL,
+        taxa_identifier_id INTEGER NOT NULL,
+        FOREIGN KEY(identifier_id) REFERENCES identifiers(id),
+        FOREIGN KEY(taxa_identifier_id) REFERENCES identifiers(id));
+    '''
+
+CONFLATION_TYPE_DRUG_CHEMICAL = 1
+CONFLATION_TYPE_GENE_PROTEIN = 2
+ALLOWED_CONFLATION_TYPES = {CONFLATION_TYPE_DRUG_CHEMICAL,
+                            CONFLATION_TYPE_GENE_PROTEIN}
+
+SQL_CREATE_TABLE_CONFLATION_CLUSTERS = \
+    f'''
+        CREATE TABLE conflation_clusters (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type INTEGER NOT NULL CHECK (type in
+        ({CONFLATION_TYPE_DRUG_CHEMICAL},
+        {CONFLATION_TYPE_GENE_PROTEIN})));
+    '''
+
+SQL_CREATE_TABLE_CONFLATION_MEMBERS = \
+    '''
+        CREATE TABLE conflation_members (
+        cluster_id INTEGER NOT NULL,
+        curie_id INTEGER NOT NULL,
+        FOREIGN KEY(cluster_id) REFERENCES conflation_clusters(id),
+        FOREIGN KEY(curie_id) REFERENCES identifiers(id),
+        UNIQUE(cluster_id, curie_id))
+    '''
 
 def create_empty_database(database_file_name: str,
                           log_work: bool = False,
@@ -165,59 +265,24 @@ def create_empty_database(database_file_name: str,
     cur = conn.cursor()
     table_creation_statements = (
         ('types',
-         '''
-         CREATE TABLE types (
-         id INTEGER PRIMARY KEY AUTOINCREMENT,
-         curie TEXT NOT NULL UNIQUE);
-         '''),
+         SQL_CREATE_TABLE_TYPES),
         ('identifiers',
-         '''
-         CREATE TABLE identifiers (
-         id INTEGER PRIMARY KEY AUTOINCREMENT,
-         curie TEXT NOT NULL UNIQUE,
-         label TEXT);
-         '''),
+         SQL_CREATE_TABLE_IDENTIFIERS),
         ('cliques',
-         '''
-         CREATE TABLE cliques (
-         id INTEGER PRIMARY KEY AUTOINCREMENT,
-         primary_identifier_id INTEGER NOT NULL,
-         ic REAL,
-         type_id INTEGER NOT NULL,
-         preferred_name TEXT NOT NULL,
-         FOREIGN KEY(primary_identifier_id) REFERENCES identifiers(id),
-         FOREIGN KEY(type_id) REFERENCES types(id));
-         '''),
+         SQL_CREATE_TABLE_CLIQUES),
         ('descriptions',
-         '''
-         CREATE TABLE descriptions (
-         id INTEGER PRIMARY KEY AUTOINCREMENT,
-         desc TEXT NOT NULL);
-         '''),
+         SQL_CREATE_TABLE_DESCRIPTIONS),
         ('identifiers_descriptions',
-         '''
-         CREATE TABLE identifiers_descriptions (
-         description_id INTEGER NOT NULL,
-         identifier_id INTEGER NOT NULL,
-         FOREIGN KEY(description_id) REFERENCES descriptions(id),
-         FOREIGN KEY(identifier_id) REFERENCES identifiers(id));
-         '''),
+         SQL_CREATE_TABLE_IDENTIFIERS_DESCRIPTIONS),
         ('identifiers_cliques',
-         '''
-         CREATE TABLE identifiers_cliques (
-         identifier_id INTEGER NOT NULL,
-         clique_id INTEGER NOT NULL,
-         FOREIGN KEY(identifier_id) REFERENCES identifiers(id),
-         FOREIGN KEY(clique_id) REFERENCES cliques(id));
-         '''),
+         SQL_CREATE_TABLE_IDENTIFIERS_CLIQUES),
         ('identifiers_taxa',
-         '''
-         CREATE TABLE identifiers_taxa (
-         identifier_id INTEGER NOT NULL,
-         taxa_identifier_id INTEGER NOT NULL,
-         FOREIGN KEY(identifier_id) REFERENCES identifiers(id),
-         FOREIGN KEY(taxa_identifier_id) REFERENCES identifiers(id));
-         '''))
+         SQL_CREATE_TABLE_IDENTIFIERS_TAXA),
+        ('conflation_clusters',
+         SQL_CREATE_TABLE_CONFLATION_CLUSTERS),
+        ('conflation_members',
+         SQL_CREATE_TABLE_CONFLATION_MEMBERS)
+    )
 
     # The `ic` field is the node's "information content", which seems to be
     # assigned by a software program called "UberGraph", and which is a real
@@ -630,6 +695,7 @@ def namespace_to_dict(namespace):
 
 
 def main(babel_compendia_url: str,
+         babel_conflation_url: str,
          database_file_name: str,
          chunk_size: int,
          use_existing_db: bool,
