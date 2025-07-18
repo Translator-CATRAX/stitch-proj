@@ -6,6 +6,7 @@ run_ruff_cmd="ruff check"
 
 files_to_check=(stitch/local_babel.py
                 stitch/ingest_babel.py
+                tests/conftest.py
                 tests/test_local_babel.py
                 tests/test_ingest_babel.py)
 
