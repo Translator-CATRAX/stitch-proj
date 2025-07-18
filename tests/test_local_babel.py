@@ -5,8 +5,7 @@ import sqlite3
 import time
 
 import pytest
-
-from local_babel import (  # replace with actual module name
+from stitch.local_babel import (
     connect_to_db_read_only,
     get_n_random_curies,
     map_any_curie_to_cliques,
@@ -40,7 +39,7 @@ def test_get_n_random_curies(db_filename: str):
 
 def test_map_any_curie_to_cliques(readonly_conn: sqlite3.Connection):
     curie = "MESH:D014867"
-    results = map_any_curie_to_cliques(readonly_conn.cursor(), curie)
+    results = map_any_curie_to_cliques(readonly_conn, curie)
     assert isinstance(results, tuple)
     for item in results:
         assert "id" in item
@@ -49,7 +48,7 @@ def test_map_any_curie_to_cliques(readonly_conn: sqlite3.Connection):
 
 def test_map_pref_curie_to_synonyms(readonly_conn: sqlite3.Connection):
     curie = "CHEBI:15377"
-    results = map_pref_curie_to_synonyms(readonly_conn, curie)
+    results = map_pref_curie_to_synonyms(readonly_conn.cursor(), curie)
     assert isinstance(results, set)
     assert all(isinstance(x, str) for x in results)
 
