@@ -32,12 +32,11 @@ import time
 from datetime import datetime
 from typing import IO, Optional
 
-import bmt
-import numpy as np
 import pandas as pd
 import ray
 import swifter  # noqa: F401
 from htmllistparse import htmllistparse
+from stitch import stitchutils as su
 
 DEFAULT_BABEL_COMPENDIA_URL = \
     'https://stars.renci.org/var/babel_outputs/2025jan23/compendia/'
@@ -51,7 +50,7 @@ DEFAULT_CHUNK_SIZE = 100000
 WAL_SIZE = 1000
 
 
-def get_args() -> argparse.Namespace:
+def _get_args() -> argparse.Namespace:
     arg_parser = argparse.ArgumentParser(description='ingest_babel.py: '
                                          'ingest the Babel compendia '
                                          ' files into a sqlite3 database')
@@ -127,7 +126,7 @@ def get_args() -> argparse.Namespace:
 
 
 # this function does not return microseconds
-def cur_datetime_local() -> datetime:
+def _cur_datetime_local_no_ms() -> datetime:
     return datetime.now().astimezone().replace(microsecond=0)
 
 
@@ -146,7 +145,7 @@ def _read_conflation_file_in_chunks(file_path: str, chunk_size: int):
             yield chunk
 
 
-def create_index(table: str,
+def _create_index(table: str,
                  col: str,
                  conn: sqlite3.Connection,
                  log_work: bool = False,
@@ -161,7 +160,7 @@ def create_index(table: str,
         print(statement, file=print_ddl_file_obj)
 
 
-def set_auto_vacuum(conn: sqlite3.Connection,
+def _set_auto_vacuum(conn: sqlite3.Connection,
                     auto_vacuum_on: bool,
                     quiet: bool = False):
     switch_str = 'FULL' if auto_vacuum_on else 'NONE'
@@ -254,14 +253,26 @@ SQL_CREATE_TABLE_CONFLATION_MEMBERS = \
         UNIQUE(cluster_id, curie_id))
     '''
 
-def create_empty_database(database_file_name: str,
-                          log_work: bool = False,
-                          print_ddl_file_obj: IO[str] | None = None) -> \
-                          sqlite3.Connection:
+SQL__CREATE_INDEX_WORK_PLAN = \
+    (('cliques',                  'type_id'),
+     ('cliques',                  'primary_identifier_id'),
+     ('identifiers_descriptions', 'description_id'),
+     ('identifiers_descriptions', 'identifier_id'),
+     ('identifiers_cliques',      'identifier_id'),
+     ('identifiers_cliques',      'clique_id'),
+     ('identifiers_taxa',         'identifier_id'),
+     ('identifiers_taxa',         'taxa_identifier_id'),
+     ('conflation_members',       'curie_id'),
+     ('conflation_clusters',      'type'))
+
+def _create_empty_database(database_file_name: str,
+                           log_work: bool = False,
+                           print_ddl_file_obj: IO[str] | None = None) -> \
+                           sqlite3.Connection:
     if os.path.exists(database_file_name):
         os.remove(database_file_name)
     conn = sqlite3.connect(database_file_name)
-    set_auto_vacuum(conn, False)
+    _set_auto_vacuum(conn, False)
     cur = conn.cursor()
     table_creation_statements = (
         ('types',
@@ -301,33 +312,29 @@ def create_empty_database(database_file_name: str,
     return conn
 
 
-def get_database(database_file_name: str,
-                 log_work: bool = False,
-                 from_scratch: bool = True,
-                 print_ddl_file_obj: IO[str] | None = None) -> \
-                 sqlite3.Connection:
+def _get_database(database_file_name: str,
+                  log_work: bool = False,
+                  from_scratch: bool = True,
+                  print_ddl_file_obj: IO[str] | None = None) -> \
+                  sqlite3.Connection:
     if from_scratch:
-        return create_empty_database(database_file_name,
-                                     log_work,
-                                     print_ddl_file_obj)
+        return _create_empty_database(database_file_name,
+                                      log_work,
+                                      print_ddl_file_obj)
     else:
         conn = sqlite3.connect(database_file_name)
-        set_auto_vacuum(conn, False)
+        _set_auto_vacuum(conn, False)
         conn.execute("VACUUM;")
         return conn
 
 
-def nan_to_none(o):
-    return o if not np.isnan(o) else None
-
-
-def first_label(group_df: pd.DataFrame):
+def _first_label(group_df: pd.DataFrame) -> pd.Series:
     return group_df.iloc[0]
 
 
-def ingest_nodenorm_jsonl_chunk(chunk: pd.core.frame.DataFrame,
-                                conn: sqlite3.Connection,
-                                insrt_missing_taxa: bool = False):
+def _ingest_nodenorm_jsonl_chunk(chunk: pd.core.frame.DataFrame,
+                                 conn: sqlite3.Connection,
+                                 insrt_missing_taxa: bool = False):
 
     unique_biolink_categories = chunk['type'].drop_duplicates().tolist()
     if unique_biolink_categories:
@@ -389,7 +396,7 @@ def ingest_nodenorm_jsonl_chunk(chunk: pd.core.frame.DataFrame,
     missing_series = curies_df.pkid.isna()
     missing_df = curies_df.loc[missing_series][['curie', 'label']]
     missing_df_gb = missing_df.swifter.progress_bar(False).groupby(by='curie')
-    missing_df_dedup = missing_df_gb.apply(first_label,
+    missing_df_dedup = missing_df_gb.apply(_first_label,
                                            include_groups=False)
     missing_df_t = tuple(missing_df_dedup.itertuples(index=True,
                                                      name=None))
@@ -472,7 +479,7 @@ def ingest_nodenorm_jsonl_chunk(chunk: pd.core.frame.DataFrame,
 
     data_to_insert_cliques = tuple(
         (curies_to_pkids[clique['primary_curie']],
-         nan_to_none(clique['ic']),
+         su.nan_to_none(clique['ic']),
          biolink_curie_to_pkid[clique['type']],
          clique['preferred_name'])
         for _, clique in chunk.iterrows())
@@ -513,17 +520,12 @@ def ingest_nodenorm_jsonl_chunk(chunk: pd.core.frame.DataFrame,
                        description_ids)
 
 
-def get_biolink_categories(log_work: bool = False) -> tuple[str]:
-    tk = bmt.Toolkit()
-    if log_work:
-        ver = tk.get_model_version()
-        print(f"loading Biolink model version: {ver}")
-    return tuple(tk.get_all_classes(formatted=True))
 
 
-def ingest_biolink_categories(biolink_categories: tuple[str],
-                              conn: sqlite3.Connection,
-                              log_work: bool = False):
+
+def _ingest_biolink_categories(biolink_categories: tuple[str],
+                               conn: sqlite3.Connection,
+                               log_work: bool = False):
     try:
         # Faster writes, but less safe
         conn.execute("BEGIN TRANSACTION;")
@@ -558,13 +560,13 @@ ROWS_PER_ANALYZE = 100000000
 ROWS_PER_VACUUM = 100 * ROWS_PER_ANALYZE  # left operand must be integer > 0
 
 
-def ingest_jsonl_url(url: str,
-                     conn: sqlite3.Connection,
-                     chunk_size: int,
-                     log_work: bool = False,
-                     total_size: Optional[int] = None,
-                     insrt_missing_taxa: bool = False,
-                     glbl_chnk_cnt_start: int = 0) -> int:
+def _ingest_jsonl_url(url: str,
+                      conn: sqlite3.Connection,
+                      chunk_size: int,
+                      log_work: bool = False,
+                      total_size: Optional[int] = None,
+                      insrt_missing_taxa: bool = False,
+                      glbl_chnk_cnt_start: int = 0) -> int:
     chunk_ctr = 0
     chunks_per_analyze = math.ceil(ROWS_PER_ANALYZE / chunk_size)
     chunks_per_vacuum = math.ceil(ROWS_PER_VACUUM / chunk_size)
@@ -583,9 +585,9 @@ def ingest_jsonl_url(url: str,
                 chunk_start_time = start_time
             else:
                 chunk_start_time = time.time()
-            ingest_nodenorm_jsonl_chunk(chunk,
-                                        conn,
-                                        insrt_missing_taxa=insrt_missing_taxa)
+            _ingest_nodenorm_jsonl_chunk(chunk,
+                                         conn,
+                                         insrt_missing_taxa=insrt_missing_taxa)
             conn.commit()
             if log_work:
                 sub_end_str = "" if total_size is not None else "\n"
@@ -639,20 +641,11 @@ def ingest_jsonl_url(url: str,
     return chunk_ctr + glbl_chnk_cnt_start
 
 
-def create_indices(conn: sqlite3.Connection,
+def _create_indices(conn: sqlite3.Connection,
                    log_work: bool = False,
                    print_ddl_file_obj: IO[str] | None = None):
-    work_plan = (('cliques',                  'type_id'),
-                 ('cliques',                  'primary_identifier_id'),
-                 ('identifiers_descriptions', 'description_id'),
-                 ('identifiers_descriptions', 'identifier_id'),
-                 ('identifiers_cliques',      'identifier_id'),
-                 ('identifiers_cliques',      'clique_id'),
-                 ('identifiers_taxa',         'identifier_id'),
-                 ('identifiers_taxa',         'taxa_identifier_id'))
-
-    for table, col in work_plan:
-        create_index(table, col, conn, log_work, print_ddl_file_obj)
+    for table, col in SQL__CREATE_INDEX_WORK_PLAN:
+        _create_index(table, col, conn, log_work, print_ddl_file_obj)
 
 
 TEST_2_COMPENDIA = ('OrganismTaxon.txt',
@@ -661,7 +654,6 @@ TEST_2_COMPENDIA = ('OrganismTaxon.txt',
                     'PhenotypicFeature.txt')
 TAXON_FILE = 'OrganismTaxon.txt'
 
-MAX_FILE_SIZE_BEFORE_SPLIT_BYTES = 10000000000
 FILE_NAME_SUFFIX_START_NUMBERED = '.txt.00'
 
 
@@ -685,13 +677,6 @@ def prune_files(file_list: list[htmllistparse.FileEntry]) ->\
                   file=sys.stderr)
     return [map_names[file_name] for file_name in use_names], \
         {file_name: map_names[file_name] for file_name in use_names}
-
-
-def namespace_to_dict(namespace):
-    return {
-        k: namespace_to_dict(v) if isinstance(v, argparse.Namespace) else v
-        for k, v in vars(namespace).items()
-    }
 
 
 def main(babel_compendia_url: str,
@@ -737,36 +722,36 @@ def main(babel_compendia_url: str,
                           key=lambda i: 0 if i.name == TAXON_FILE else 1)
 
     start_time_sec = time.time()
-    date_time_local = cur_datetime_local().isoformat()
+    date_time_local = _cur_datetime_local_no_ms().isoformat()
     print(f"Starting database ingest at: {date_time_local}")
     if test_type:
         print(f"Running in test mode; test type: {test_type}")
-    with get_database(database_file_name,
-                      log_work=log_work,
-                      from_scratch=from_scratch,
-                      print_ddl_file_obj=print_ddl_file_obj) as conn:
+    with _get_database(database_file_name,
+                       log_work=log_work,
+                       from_scratch=from_scratch,
+                       print_ddl_file_obj=print_ddl_file_obj) as conn:
         conn.execute("PRAGMA synchronous = OFF;")
         conn.execute("PRAGMA journal_mode = WAL;")
         conn.execute(f"PRAGMA wal_autocheckpoint = {WAL_SIZE};")
         if from_scratch:
-            ingest_biolink_categories(get_biolink_categories(log_work),
-                                      conn,
-                                      log_work)
-            create_indices(conn,
-                           log_work,
-                           print_ddl_file_obj=print_ddl_file_obj)
+            _ingest_biolink_categories(su.get_biolink_categories(log_work),
+                                       conn,
+                                       log_work)
+            _create_indices(conn,
+                            log_work,
+                            print_ddl_file_obj=print_ddl_file_obj)
         glbl_chnk_cnt = 0
         if test_type == 1:
             if test_file is None:
                 raise ValueError("test_file cannot be None")
             print(f"ingesting file: {test_file}")
             glbl_chnk_cnt = \
-                ingest_jsonl_url(test_file,
-                                 conn=conn,
-                                 chunk_size=chunk_size,
-                                 log_work=log_work,
-                                 insrt_missing_taxa=True,
-                                 glbl_chnk_cnt_start=glbl_chnk_cnt)
+                _ingest_jsonl_url(test_file,
+                                  conn=conn,
+                                  chunk_size=chunk_size,
+                                  log_work=log_work,
+                                  insrt_missing_taxa=True,
+                                  glbl_chnk_cnt_start=glbl_chnk_cnt)
         elif test_type == 2:
             # after ingesting Biolink categories, need to ingest OrganismTaxon
             # first!
@@ -782,13 +767,13 @@ def main(babel_compendia_url: str,
                       f"file size: {file_size} bytes")
                 if not dry_run:
                     glbl_chnk_cnt = \
-                        ingest_jsonl_url(babel_compendia_url + file_name,
-                                         conn=conn,
-                                         chunk_size=chunk_size,
-                                         log_work=log_work,
-                                         total_size=file_size,
-                                         insrt_missing_taxa=True,
-                                         glbl_chnk_cnt_start=glbl_chnk_cnt)
+                        _ingest_jsonl_url(babel_compendia_url + file_name,
+                                          conn=conn,
+                                          chunk_size=chunk_size,
+                                          log_work=log_work,
+                                          total_size=file_size,
+                                          insrt_missing_taxa=True,
+                                          glbl_chnk_cnt_start=glbl_chnk_cnt)
         else:
             assert test_type is None, f"invalid test_type: {test_type}"
             start_time = time.time()
@@ -803,17 +788,17 @@ def main(babel_compendia_url: str,
                       f"file size: {file_size} bytes")
                 if not dry_run:
                     glbl_chnk_cnt = \
-                        ingest_jsonl_url(babel_compendia_url +
-                                         file_name,
-                                         conn=conn,
-                                         chunk_size=chunk_size,
-                                         log_work=log_work,
-                                         total_size=file_size,
-                                         insrt_missing_taxa=True,
-                                         glbl_chnk_cnt_start=glbl_chnk_cnt)
+                        _ingest_jsonl_url(babel_compendia_url +
+                                          file_name,
+                                          conn=conn,
+                                          chunk_size=chunk_size,
+                                          log_work=log_work,
+                                          total_size=file_size,
+                                          insrt_missing_taxa=True,
+                                          glbl_chnk_cnt_start=glbl_chnk_cnt)
         conn.execute("PRAGMA wal_checkpoint(FULL);")
         conn.execute("PRAGMA journal_mode = DELETE;")
-        set_auto_vacuum(conn, True)
+        _set_auto_vacuum(conn, True)
         if log_work:
             final_cleanup_start_time = time.time()
         conn.execute("ANALYZE")
@@ -824,7 +809,7 @@ def main(babel_compendia_url: str,
                                                      final_cleanup_start_time)
             print("running ANALYZE and VACUUM (final cleanup) took: "
                   f"{final_cleanup_elapsed_time} (HHH:MM::SS)")
-    date_time_local = cur_datetime_local().isoformat()
+    date_time_local = _cur_datetime_local_no_ms().isoformat()
     print(f"Finished database ingest at: {date_time_local}")
     print(f"Total number of chunks inserted: {glbl_chnk_cnt}")
     elapsed_time_str = convert_sec(time.time() - start_time_sec)
@@ -832,4 +817,4 @@ def main(babel_compendia_url: str,
 
 
 if __name__ == "__main__":
-    main(**namespace_to_dict(get_args()))
+    main(**su.namespace_to_dict(_get_args()))
