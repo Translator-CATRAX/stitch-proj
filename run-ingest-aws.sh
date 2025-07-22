@@ -3,7 +3,7 @@
 set -o nounset -o pipefail -o errexit
 
 STITCH_DIR=/home/ubuntu/stitch
-STITCH_TMP_DIR=/mnt/data/stitch/tmp
+STITCH_TMP_DIR=/home/ubuntu/stitch/tmp
 STITCH_LOG_FILE=${STITCH_DIR}/ingest-babel.log
 STITCH_SQLITE_FILE=${STITCH_DIR}/babel.sqlite
 BABEL_COMPENDIA_BASE_URL=https://stars.renci.org/var/babel_outputs/2025jan23/compendia/
