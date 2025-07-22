@@ -95,7 +95,7 @@ source venv/bin/activate
 pytest -v
 ```
 
-# How to regenerate the schema digram
+# How to regenerate the schema diagram
 
 Use the `ingest_babel.py` script to generate the `ddl.sql` file as follows: ```
 source venv/bin/activate python3 stitch/ingest_babel.sql --print-ddl --dry-run
