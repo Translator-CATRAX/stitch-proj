@@ -67,7 +67,7 @@ and unit tests (using `pytest`).
 
 # Schema
 This schema diagram was generated using DbVisualizer Free version 24.3.3.
-![stitch Babel sqlite3 database schema](schema.png)
+![stitch Babel sqlite3 database schema with conflation](schema.png)
 
 In the `cliques` table, the combination of columns `primary_identifier_id` and
 `type_id` are unique, as confirmed by this SQL query returning no rows:
