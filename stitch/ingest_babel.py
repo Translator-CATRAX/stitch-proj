@@ -17,7 +17,7 @@
 # - `tail -f ingest_babel.log` (so you can watch the progress)
 # - In another terminal session, watch memory usage using `top`
 
-# Thank you to Gaurav Vaidya for helpful information about Babel!
+# Thank you to Gaurav Vaidya for helpful information about Babel.
 
 import argparse
 import ast
@@ -30,18 +30,25 @@ import sys
 import tempfile
 import time
 from datetime import datetime
-from typing import IO, Optional
+from typing import IO, Callable, Generator, Iterable, Optional, cast
 
 import pandas as pd
 import ray
 import swifter  # noqa: F401
 from htmllistparse import htmllistparse
+
+# The "noqa: F401" for "import swifter" is needed because swifter is somehow
+# automagically used once you import it, but the "ruff" lint checker software
+# doesn't detect that use of the "swifter" module, so it flags an F401 error.
+
+# make it convenient to run ingest_babel.py using `python3 stitch/ingest_babel.py`
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from stitch import stitchutils as su
 
 DEFAULT_BABEL_COMPENDIA_URL = \
-    'https://stars.renci.org/var/babel_outputs/2025jan23/compendia/'
+    'https://stars.renci.org/var/babel_outputs/2025mar31/compendia/'
 DEFAULT_BABEL_CONFLATION_URL = \
-    'https://stars.renci.org/var/babel_outputs/2025jan23/conflation/'
+    'https://stars.renci.org/var/babel_outputs/2025mar31/conflation/'
 DEFAULT_DATABASE_FILE_NAME = 'babel.sqlite'
 
 DEFAULT_TEST_TYPE = None
@@ -130,26 +137,11 @@ def _cur_datetime_local_no_ms() -> datetime:
     return datetime.now().astimezone().replace(microsecond=0)
 
 
-def _read_conflation_file_in_chunks(file_path: str, chunk_size: int):
-    chunk = []
-    with open(file_path, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                parsed_list = ast.literal_eval(line)
-                chunk.append(parsed_list)
-                if len(chunk) >= chunk_size:
-                    yield chunk
-                    chunk = []
-        if chunk:
-            yield chunk
-
-
 def _create_index(table: str,
-                 col: str,
-                 conn: sqlite3.Connection,
-                 log_work: bool = False,
-                 print_ddl_file_obj: IO[str] | None = None):
+                  col: str,
+                  conn: sqlite3.Connection,
+                  log_work: bool = False,
+                  print_ddl_file_obj: IO[str] | None = None):
     statement = 'CREATE INDEX ' +\
         f'idx_{table}_{col} ' +\
         f'ON {table} ({col});'
@@ -159,14 +151,45 @@ def _create_index(table: str,
     if print_ddl_file_obj is not None:
         print(statement, file=print_ddl_file_obj)
 
+def _do_index_analyze(conn: sqlite3.Connection,
+                      log_work: bool):
+    if log_work:
+        analyze_start_time = time.time()
+    conn.execute("ANALYZE;")
+    if log_work:
+        analyze_end_time = time.time()
+        analyze_elapsed_time = \
+            su.format_time_seconds_to_str(analyze_end_time -
+                                          analyze_start_time)
+        print(f"running ANALYZE took: {analyze_elapsed_time} "
+              "(HHH:MM::SS)")
+
+def _do_index_vacuum(conn: sqlite3.Connection,
+                     log_work: bool):
+    if log_work:
+        vacuum_start_time = time.time()
+    conn.execute("PRAGMA wal_checkpoint(FULL);")
+    conn.execute("PRAGMA journal_mode = DELETE;")
+    conn.execute("VACUUM;")
+    conn.execute("PRAGMA journal_mode = WAL;")
+    if log_work:
+        vacuum_end_time = time.time()
+        vacuum_elapsed_time = \
+            su.format_time_seconds_to_str(vacuum_end_time -
+                                          vacuum_start_time)
+        print(f"running VACUUM took: {vacuum_elapsed_time} "
+              "(HHH:MM::SS)")
 
 def _set_auto_vacuum(conn: sqlite3.Connection,
-                    auto_vacuum_on: bool,
-                    quiet: bool = False):
+                     auto_vacuum_on: bool,
+                     quiet: bool = False):
     switch_str = 'FULL' if auto_vacuum_on else 'NONE'
     conn.execute(f"PRAGMA auto_vacuum={switch_str};")
     if not quiet:
         print(f"setting auto_vacuum to: {switch_str}")
+
+def _merge_ints_to_str(t: Iterable[int], delim: str) -> str:
+    return delim.join(map(str, t))
 
 SQL_CREATE_TABLE_TYPES = \
     '''
@@ -192,7 +215,8 @@ SQL_CREATE_TABLE_CLIQUES = \
         type_id INTEGER NOT NULL,
         preferred_name TEXT NOT NULL,
         FOREIGN KEY(primary_identifier_id) REFERENCES identifiers(id),
-        FOREIGN KEY(type_id) REFERENCES types(id));
+        FOREIGN KEY(type_id) REFERENCES types(id),
+        UNIQUE(primary_identifier_id, type_id));
     '''
 
 SQL_CREATE_TABLE_DESCRIPTIONS = \
@@ -229,18 +253,21 @@ SQL_CREATE_TABLE_IDENTIFIERS_TAXA = \
         FOREIGN KEY(taxa_identifier_id) REFERENCES identifiers(id));
     '''
 
-CONFLATION_TYPE_DRUG_CHEMICAL = 1
-CONFLATION_TYPE_GENE_PROTEIN = 2
-ALLOWED_CONFLATION_TYPES = {CONFLATION_TYPE_DRUG_CHEMICAL,
-                            CONFLATION_TYPE_GENE_PROTEIN}
+
+COMPENDIA_FILE_SUFFIX = '.txt'
+CONFLATION_FILE_SUFFIX = '.txt'
+CONFLATION_TYPE_NAMES_IDS = \
+    {'DrugChemical': 1,
+     'GeneProtein': 2}
+
+ALLOWED_CONFLATION_TYPES = set(CONFLATION_TYPE_NAMES_IDS.values())
 
 SQL_CREATE_TABLE_CONFLATION_CLUSTERS = \
     f'''
         CREATE TABLE conflation_clusters (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         type INTEGER NOT NULL CHECK (type in
-        ({CONFLATION_TYPE_DRUG_CHEMICAL},
-        {CONFLATION_TYPE_GENE_PROTEIN})));
+        ({_merge_ints_to_str(ALLOWED_CONFLATION_TYPES, ', ')})));
     '''
 
 SQL_CREATE_TABLE_CONFLATION_MEMBERS = \
@@ -321,20 +348,19 @@ def _get_database(database_file_name: str,
         return _create_empty_database(database_file_name,
                                       log_work,
                                       print_ddl_file_obj)
-    else:
-        conn = sqlite3.connect(database_file_name)
-        _set_auto_vacuum(conn, False)
-        conn.execute("VACUUM;")
-        return conn
+    conn = sqlite3.connect(database_file_name)
+    _set_auto_vacuum(conn, False)
+    conn.execute("VACUUM;")
+    return conn
 
 
 def _first_label(group_df: pd.DataFrame) -> pd.Series:
     return group_df.iloc[0]
 
 
-def _ingest_nodenorm_jsonl_chunk(chunk: pd.core.frame.DataFrame,
-                                 conn: sqlite3.Connection,
-                                 insrt_missing_taxa: bool = False):
+def _ingest_compendia_jsonl_chunk(chunk: pd.core.frame.DataFrame,
+                                  conn: sqlite3.Connection,
+                                  insrt_missing_taxa: bool = False):
 
     unique_biolink_categories = chunk['type'].drop_duplicates().tolist()
     if unique_biolink_categories:
@@ -495,8 +521,8 @@ def _ingest_nodenorm_jsonl_chunk(chunk: pd.core.frame.DataFrame,
     chunk['clique_pkid'] = clique_pkids
 
     identifiers_cliques_data = tuple(
-         (row['pkid'], int(chunk.iloc[row['chunk_row']]['clique_pkid']))
-         for id, row in curies_df.iterrows())
+        (row['pkid'], int(chunk.iloc[row['chunk_row']]['clique_pkid']))
+        for id, row in curies_df.iterrows())
 
     cursor.executemany('INSERT INTO identifiers_cliques '
                        '(identifier_id, clique_id) '
@@ -520,10 +546,7 @@ def _ingest_nodenorm_jsonl_chunk(chunk: pd.core.frame.DataFrame,
                        description_ids)
 
 
-
-
-
-def _ingest_biolink_categories(biolink_categories: tuple[str],
+def _ingest_biolink_categories(biolink_categories: set[str],
                                conn: sqlite3.Connection,
                                log_work: bool = False):
     try:
@@ -531,42 +554,135 @@ def _ingest_biolink_categories(biolink_categories: tuple[str],
         conn.execute("BEGIN TRANSACTION;")
         cursor = conn.cursor()
         if log_work:
-            print("ingesting Biolink categories")
-        cursor.executemany("INSERT INTO types (curie) VALUES (?);",
-                           tuple((i,) for i in biolink_categories))
-        conn.commit()
+            print(f"ingesting {len(biolink_categories)} Biolink categories")
+            cursor.executemany("INSERT INTO types (curie) VALUES (?);",
+                               tuple((i,) for i in biolink_categories))
+            conn.commit()
     except Exception as e:
         conn.rollback()
         raise e
 
 
-def byte_count_df(df: pd.core.frame.DataFrame) -> int:
-    return len(json.dumps(df.to_dict(orient='records'))) + \
-        df.shape[0]
-
-
-SECS_PER_MIN = 60
-SECS_PER_HOUR = 3600
-
-
-def convert_sec(seconds: float) -> str:
-    hours: int = int(seconds // SECS_PER_HOUR)
-    minutes: int = int((seconds % SECS_PER_HOUR) // SECS_PER_MIN)
-    remaining_seconds: float = seconds % SECS_PER_MIN
-    return f"{hours:03d}:{minutes:02d}:{remaining_seconds:02.0f}"
-
+def _byte_count_chunk(chunk: pd.core.frame.DataFrame|list[str]) -> int:
+    dumpable = chunk.to_dict(orient='records') \
+        if type(chunk) is pd.core.frame.DataFrame \
+           else chunk
+    return len(json.dumps(dumpable))
 
 ROWS_PER_ANALYZE = 100000000
 ROWS_PER_VACUUM = 100 * ROWS_PER_ANALYZE  # left operand must be integer > 0
 
 
-def _ingest_jsonl_url(url: str,
-                      conn: sqlite3.Connection,
-                      chunk_size: int,
-                      log_work: bool = False,
-                      total_size: Optional[int] = None,
-                      insrt_missing_taxa: bool = False,
-                      glbl_chnk_cnt_start: int = 0) -> int:
+def _read_conflation_file_in_chunks(file_path: str, chunk_size: int) -> \
+        Generator[list[list[str]], None, None]:
+    chunk = []
+    with open(file_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                parsed_list = ast.literal_eval(line)
+                chunk.append(parsed_list)
+                if len(chunk) >= chunk_size:
+                    yield chunk
+                    chunk = []
+        if chunk:
+            yield chunk
+
+
+
+def _make_conflation_chunk_processor(conn: sqlite3.Connection,
+                                     conflation_type: int) -> Callable:
+    if conflation_type not in ALLOWED_CONFLATION_TYPES:
+        raise ValueError(f"invalid conflation_type value: {conflation_type};"
+                         "it must be in the set: {ALLOWED_CONFLATION_TYPES}")
+    def _process_conflation_chunk(chunk: Iterable[str]):
+        cursor = conn.cursor()
+        for line in chunk:
+            curie_list = ast.literal_eval(line)
+            if not curie_list:
+                raise ValueError("empty curie_list")
+            # make new id
+            cluster_id = cursor.execute("INSERT INTO conflation_clusters (type) "
+                                        "VALUES (?) RETURNING id;",
+                                        (conflation_type,)).fetchone()[0]
+            placeholders = ','.join(['?'] * len(curie_list))
+            query = f"SELECT id from identifiers WHERE curie IN ({placeholders});"
+            assert len(curie_list)==query.count('?'), "placeholder count mismatch"
+            ids = conn.execute(query, curie_list).fetchall()
+            insert_data = tuple((cluster_id, curie_id_tuple[0]) for \
+                                curie_id_tuple in ids)
+            cursor.executemany("INSERT INTO conflation_members (cluster_id, curie_id) "
+                               "VALUES (?, ?);",
+                               insert_data)
+    return _process_conflation_chunk
+
+
+
+def _ingest_conflation_file_url(url: str,
+                                conn: sqlite3.Connection,
+                                chunk_size: int,
+                                conflation_type_id: int,
+                                log_work: bool = False,
+                                total_size: Optional[int] = None,
+                                glbl_chnk_cnt_start: int = 0) -> int:
+    process_chunk = _make_conflation_chunk_processor(conn,
+                                                     conflation_type_id)
+    chunk_ctr = 0
+    chunks_per_analyze = math.ceil(ROWS_PER_ANALYZE / chunk_size)
+    chunks_per_vacuum = math.ceil(ROWS_PER_VACUUM / chunk_size)
+    for chunk in su.get_line_chunks_from_url(url, chunk_size):
+        chunk_ctr += 1
+        try:
+            end_str = "" if log_work else "\n"
+            print(f"  Loading conflation chunk {chunk_ctr}", end=end_str)
+            conn.execute("BEGIN TRANSACTION;")
+            if log_work and chunk_ctr == 1:
+                start_time = time.time()
+                chunk_start_time = start_time
+            else:
+                chunk_start_time = time.time()
+            process_chunk(chunk)
+            conn.commit()
+            if log_work:
+                sub_end_str = "" if total_size is not None else "\n"
+                elapsed_time = (time.time() - start_time)
+                elapsed_time_str = su.format_time_seconds_to_str(elapsed_time)
+                chunk_elapsed_time_str = su.format_time_seconds_to_str(time.time() -
+                                                                       chunk_start_time)
+                print(f"; time spent on URL: {elapsed_time_str}; "
+                      f"spent on chunk: {chunk_elapsed_time_str}",
+                      end=sub_end_str)
+                if total_size is not None:
+                    if chunk_ctr == 1:
+                        chunk_size = _byte_count_chunk(chunk)
+                        num_chunks = math.ceil(total_size / chunk_size)
+                    pct_complete = min(100.0, 100.0 * (chunk_ctr / num_chunks))
+                    time_to_complete = elapsed_time * \
+                        (100.0 - pct_complete)/pct_complete
+                    time_to_complete_str = \
+                        su.format_time_seconds_to_str(time_to_complete)
+                    print(f"; {pct_complete:0.2f}% complete"
+                          f"; time to complete file: {time_to_complete_str}")
+                else:
+                    print("\n")
+            if (chunk_ctr + glbl_chnk_cnt_start) % \
+               chunks_per_analyze == 0:
+                _do_index_analyze(conn, log_work)
+                if (chunk_ctr + glbl_chnk_cnt_start) % \
+                   chunks_per_vacuum == 0:
+                    _do_index_vacuum(conn, log_work)
+        except Exception as e:
+            conn.rollback()
+            raise e
+    return chunk_ctr + glbl_chnk_cnt_start
+
+def _ingest_compendia_jsonl_url(url: str,
+                                conn: sqlite3.Connection,
+                                chunk_size: int,
+                                log_work: bool = False,
+                                total_size: Optional[int] = None,
+                                insrt_missing_taxa: bool = False,
+                                glbl_chnk_cnt_start: int = 0) -> int:
     chunk_ctr = 0
     chunks_per_analyze = math.ceil(ROWS_PER_ANALYZE / chunk_size)
     chunks_per_vacuum = math.ceil(ROWS_PER_VACUUM / chunk_size)
@@ -578,72 +694,54 @@ def _ingest_jsonl_url(url: str,
         chunk_ctr += 1
         try:
             end_str = "" if log_work else "\n"
-            print(f"  Loading chunk {chunk_ctr}", end=end_str)
+            print(f"  Loading compendia chunk {chunk_ctr}", end=end_str)
             conn.execute("BEGIN TRANSACTION;")
             if log_work and chunk_ctr == 1:
                 start_time = time.time()
                 chunk_start_time = start_time
             else:
                 chunk_start_time = time.time()
-            _ingest_nodenorm_jsonl_chunk(chunk,
-                                         conn,
-                                         insrt_missing_taxa=insrt_missing_taxa)
+            _ingest_compendia_jsonl_chunk(chunk,
+                                          conn,
+                                          insrt_missing_taxa=insrt_missing_taxa)
             conn.commit()
             if log_work:
                 sub_end_str = "" if total_size is not None else "\n"
-                chunk_end_time = time.time()
-                elapsed_time = (chunk_end_time - start_time)
-                elapsed_time_str = convert_sec(elapsed_time)
-                chunk_elapsed_time_str = convert_sec(chunk_end_time -
-                                                     chunk_start_time)
+                elapsed_time = (time.time() - start_time)
+                elapsed_time_str = su.format_time_seconds_to_str(elapsed_time)
+                chunk_elapsed_time_str = su.format_time_seconds_to_str(time.time() -
+                                                                       chunk_start_time)
                 print(f"; time spent on URL: {elapsed_time_str}; "
                       f"spent on chunk: {chunk_elapsed_time_str}",
                       end=sub_end_str)
                 if total_size is not None:
                     if chunk_ctr == 1:
-                        chunk_size = byte_count_df(chunk)
+                        chunk_size = _byte_count_chunk(chunk)
                         num_chunks = math.ceil(total_size / chunk_size)
                     pct_complete = min(100.0, 100.0 * (chunk_ctr / num_chunks))
                     time_to_complete = elapsed_time * \
                         (100.0 - pct_complete)/pct_complete
-                    time_to_complete_str = convert_sec(time_to_complete)
+                    time_to_complete_str = \
+                        su.format_time_seconds_to_str(time_to_complete)
                     print(f"; {pct_complete:0.2f}% complete"
-                          f"; time to complete: {time_to_complete_str}")
+                          f"; time to complete file: {time_to_complete_str}")
+                else:
+                    print("\n")
             if (chunk_ctr + glbl_chnk_cnt_start) % \
                chunks_per_analyze == 0:
-                if log_work:
-                    analyze_start_time = time.time()
-                conn.execute("ANALYZE;")
-                if log_work:
-                    analyze_end_time = time.time()
-                    analyze_elapsed_time = convert_sec(analyze_end_time -
-                                                       analyze_start_time)
-                    print(f"running ANALYZE took: {analyze_elapsed_time} "
-                          "(HHH:MM::SS)")
+                _do_index_analyze(conn, log_work)
                 if (chunk_ctr + glbl_chnk_cnt_start) % \
                    chunks_per_vacuum == 0:
-                    if log_work:
-                        vacuum_start_time = time.time()
-                    conn.execute("PRAGMA wal_checkpoint(FULL);")
-                    conn.execute("PRAGMA journal_mode = DELETE;")
-                    conn.execute("VACUUM;")
-                    conn.execute("PRAGMA journal_mode = WAL;")
-                    if log_work:
-                        vacuum_end_time = time.time()
-                        vacuum_elapsed_time = convert_sec(vacuum_end_time -
-                                                          vacuum_start_time)
-                        print(f"running VACUUM took: {vacuum_elapsed_time} "
-                              "(HHH:MM::SS)")
+                    _do_index_vacuum(conn, log_work)
         except Exception as e:
             conn.rollback()
             raise e
-
     return chunk_ctr + glbl_chnk_cnt_start
 
 
 def _create_indices(conn: sqlite3.Connection,
-                   log_work: bool = False,
-                   print_ddl_file_obj: IO[str] | None = None):
+                    log_work: bool = False,
+                    print_ddl_file_obj: IO[str] | None = None):
     for table, col in SQL__CREATE_INDEX_WORK_PLAN:
         _create_index(table, col, conn, log_work, print_ddl_file_obj)
 
@@ -652,32 +750,120 @@ TEST_2_COMPENDIA = ('OrganismTaxon.txt',
                     'ComplexMolecularMixture.txt',
                     'Polypeptide.txt',
                     'PhenotypicFeature.txt')
+TEST_3_COMPENDIA = ('Drug.txt',
+                    'ChemicalEntity.txt',
+                    'SmallMolecule.txt.01')
+TEST_3_CONFLATION = ('DrugChemical.txt',)
 TAXON_FILE = 'OrganismTaxon.txt'
 
-FILE_NAME_SUFFIX_START_NUMBERED = '.txt.00'
+FILE_NAME_SUFFIX_START_NUMBERED = COMPENDIA_FILE_SUFFIX + '.00'
 
 
-def prune_files(file_list: list[htmllistparse.FileEntry]) ->\
-        tuple[list[htmllistparse.FileEntry],
-              dict[str, htmllistparse.FileEntry]]:
+def _prune_compendia_files(file_list: list[htmllistparse.FileEntry]) ->\
+    tuple[tuple[str, ...],
+          dict[str, htmllistparse.FileEntry]]:
     use_names: list[str] = []
     map_names = {fe.name: fe for fe in file_list}
     for file_entry in file_list:
         file_name = file_entry.name
-        if '.txt' in file_name:
+        if COMPENDIA_FILE_SUFFIX in file_name:
             if file_name.endswith(FILE_NAME_SUFFIX_START_NUMBERED):
                 file_name_start_numbered_ind = \
                     file_name.find(FILE_NAME_SUFFIX_START_NUMBERED)
                 file_name_prefix = \
                     file_name[0:file_name_start_numbered_ind]
-                use_names.remove(file_name_prefix + '.txt')
+                use_names.remove(file_name_prefix + COMPENDIA_FILE_SUFFIX)
             use_names.append(file_name)
         else:
             print(f"Warning: unrecognized file name {file_name}",
                   file=sys.stderr)
-    return [map_names[file_name] for file_name in use_names], \
+    return tuple(use_names), \
         {file_name: map_names[file_name] for file_name in use_names}
 
+def _prune_conflation_files(file_list: list[htmllistparse.FileEntry]) ->\
+        tuple[tuple[str, ...],
+              dict[str, htmllistparse.FileEntry]]:
+    pairs: tuple[tuple[str, htmllistparse.FileEntry], ...] = tuple(
+        (fe.name, fe) for fe in file_list if fe.name.endswith(CONFLATION_FILE_SUFFIX)
+    )
+    name_tuple, entry_tuple = \
+        cast(tuple[tuple[str, ...], tuple[htmllistparse.FileEntry, ...]],
+             tuple(zip(*pairs)) if pairs else ((), ())
+             )
+    return name_tuple, dict(zip(name_tuple, entry_tuple))
+
+def _get_compendia_files(compendia_files_index_url: str) ->\
+        tuple[tuple[str, ...], dict[str, htmllistparse.FileEntry]]:
+    compendia_listing: list[htmllistparse.FileEntry]
+    _, compendia_listing = htmllistparse.fetch_listing(compendia_files_index_url)
+    compendia_pruned_files, compendia_map_names = \
+        _prune_compendia_files(compendia_listing)
+    compendia_sorted_files = sorted(compendia_pruned_files,
+                                    key=lambda file_name: 0 \
+                                    if file_name == TAXON_FILE else 1)
+    return tuple(compendia_sorted_files), compendia_map_names
+
+def _get_conflation_files(conflation_files_index_url: str) ->\
+        tuple[tuple[str, ...], dict[str, htmllistparse.FileEntry]]:
+    _, conflation_listing = htmllistparse.fetch_listing(conflation_files_index_url)
+    conflation_pruned_files, conflation_map_names = \
+        _prune_conflation_files(conflation_listing)
+    conflation_sorted_files = sorted(conflation_pruned_files)
+    return tuple(conflation_sorted_files), conflation_map_names
+
+def _set_pragmas_for_ingestion(conn: sqlite3.Connection,
+                               wal_size: int):
+    conn.execute("PRAGMA synchronous = OFF;")
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute(f"PRAGMA wal_autocheckpoint = {wal_size};")
+
+def _set_pragmas_for_querying(conn: sqlite3.Connection):
+    conn.execute("PRAGMA wal_checkpoint(FULL);")
+    conn.execute("PRAGMA journal_mode = DELETE;")
+    # This last one is unnecessary if DB is read-only:
+    conn.execute("PRAGMA synchronous = FULL;")
+
+def _cleanup_indices(conn: sqlite3.Connection):
+    conn.execute("ANALYZE")
+    conn.execute("VACUUM")
+
+def _do_final_cleanup(conn: sqlite3.Connection,
+                      log_work: bool,
+                      glbl_chnk_cnt: int,
+                      start_time_sec: float):
+        if log_work:
+            final_cleanup_start_time = time.time()
+        _cleanup_indices(conn)
+        if log_work:
+            final_cleanup_elapsed_time = \
+                su.format_time_seconds_to_str(time.time() -
+                                              final_cleanup_start_time)
+            print("running ANALYZE and VACUUM (final cleanup) took: "
+                  f"{final_cleanup_elapsed_time} (HHH:MM::SS)")
+            date_time_local = _cur_datetime_local_no_ms().isoformat()
+            print(f"Finished database ingest at: {date_time_local}")
+            print(f"Total number of chunks inserted: {glbl_chnk_cnt}")
+            elapsed_time_str = \
+                su.format_time_seconds_to_str(time.time() - start_time_sec)
+            print(f"Elapsed time for Babel ingest: {elapsed_time_str} (HHH:MM::SS)")
+
+def _initialize_ray():
+    # initialize Ray after any changes to tmp dir location
+    logging.getLogger("ray").setLevel(logging.ERROR)
+    ray.init(logging_level=logging.ERROR)
+
+def _customize_temp_dir(temp_dir: str,
+                        no_exec: bool,
+                        quiet: bool):
+    os.environ["SQLITE_TMPDIR"] = temp_dir
+    if not no_exec:
+        python_exe = sys.executable
+        new_args = [python_exe, sys.argv[0], *sys.argv[1:], "--no-exec"]
+        os.execve(python_exe, new_args, os.environ.copy())
+        os.environ["RAY_TMPDIR"] = temp_dir
+        tempfile.tempdir = temp_dir
+    if not quiet:
+        print(f"Setting temp dir to: {temp_dir}")
 
 def main(babel_compendia_url: str,
          babel_conflation_url: str,
@@ -692,47 +878,32 @@ def main(babel_compendia_url: str,
          temp_dir: str,
          no_exec: bool):
 
-
     if temp_dir is not None:
-        os.environ["SQLITE_TMPDIR"] = temp_dir
-        if not no_exec:
-            python_exe = sys.executable
-            new_args = [python_exe, sys.argv[0], *sys.argv[1:], "--no-exec"]
-            os.execve(python_exe, new_args, os.environ.copy())
-        os.environ["RAY_TMPDIR"] = temp_dir
-        tempfile.tempdir = temp_dir
-        if not quiet:
-            print(f"Setting temp dir to: {temp_dir}")
+        _customize_temp_dir(temp_dir, no_exec, quiet)
 
-    # initialize Ray after any changes to tmp dir location
-    logging.getLogger("ray").setLevel(logging.ERROR)
-    ray.init(logging_level=logging.ERROR)
+    _initialize_ray()
 
-    print_ddl_file_obj: IO[str] | None
-    if print_ddl:
-        print_ddl_file_obj = sys.stderr
-    else:
-        print_ddl_file_obj = None
+    print_ddl_file_obj = sys.stderr if print_ddl else None
     log_work = not quiet
     from_scratch = not use_existing_db
-    listing: list[htmllistparse.FileEntry]
-    _, listing = htmllistparse.fetch_listing(babel_compendia_url)
-    pruned_files, map_names = prune_files(listing)
-    sorted_files = sorted(pruned_files,
-                          key=lambda i: 0 if i.name == TAXON_FILE else 1)
 
+    compendia_sorted_files, compendia_map_names = \
+        _get_compendia_files(babel_compendia_url)
+    conflation_sorted_files, conflation_map_names = \
+        _get_conflation_files(babel_conflation_url)
     start_time_sec = time.time()
     date_time_local = _cur_datetime_local_no_ms().isoformat()
     print(f"Starting database ingest at: {date_time_local}")
     if test_type:
         print(f"Running in test mode; test type: {test_type}")
+
     with _get_database(database_file_name,
                        log_work=log_work,
                        from_scratch=from_scratch,
                        print_ddl_file_obj=print_ddl_file_obj) as conn:
-        conn.execute("PRAGMA synchronous = OFF;")
-        conn.execute("PRAGMA journal_mode = WAL;")
-        conn.execute(f"PRAGMA wal_autocheckpoint = {WAL_SIZE};")
+
+        _set_pragmas_for_ingestion(conn, WAL_SIZE)
+
         if from_scratch:
             _ingest_biolink_categories(su.get_biolink_categories(log_work),
                                        conn,
@@ -740,80 +911,135 @@ def main(babel_compendia_url: str,
             _create_indices(conn,
                             log_work,
                             print_ddl_file_obj=print_ddl_file_obj)
+
         glbl_chnk_cnt = 0
+
         if test_type == 1:
             if test_file is None:
                 raise ValueError("test_file cannot be None")
             print(f"ingesting file: {test_file}")
             glbl_chnk_cnt = \
-                _ingest_jsonl_url(test_file,
-                                  conn=conn,
-                                  chunk_size=chunk_size,
-                                  log_work=log_work,
-                                  insrt_missing_taxa=True,
-                                  glbl_chnk_cnt_start=glbl_chnk_cnt)
+                _ingest_compendia_jsonl_url(test_file,
+                                            conn=conn,
+                                            chunk_size=chunk_size,
+                                            log_work=log_work,
+                                            insrt_missing_taxa=True,
+                                            glbl_chnk_cnt_start=glbl_chnk_cnt)
         elif test_type == 2:
             # after ingesting Biolink categories, need to ingest OrganismTaxon
             # first!
-            start_time = time.time()
             for file_name in TEST_2_COMPENDIA:
-                file_entry = map_names[file_name]
-                file_size = file_entry.size
-                print(f"ingesting file: {file_name}")
-                cur_time = time.time()
-                elapsed_time_str = convert_sec(cur_time - start_time)
+                file_size = compendia_map_names[file_name].size
+                print(f"ingesting compendia file: {file_name}")
+                elapsed_time_str = su.format_time_seconds_to_str(time.time() -
+                                                                 start_time_sec)
                 print(f"at elapsed time: {elapsed_time_str}; "
-                      f"starting ingest of file: {file_name}; "
+                      f"starting ingest of compendia file: {file_name}; "
                       f"file size: {file_size} bytes")
                 if not dry_run:
                     glbl_chnk_cnt = \
-                        _ingest_jsonl_url(babel_compendia_url + file_name,
-                                          conn=conn,
-                                          chunk_size=chunk_size,
-                                          log_work=log_work,
-                                          total_size=file_size,
-                                          insrt_missing_taxa=True,
-                                          glbl_chnk_cnt_start=glbl_chnk_cnt)
+                        _ingest_compendia_jsonl_url(babel_compendia_url + file_name,
+                                                    conn=conn,
+                                                    chunk_size=chunk_size,
+                                                    log_work=log_work,
+                                                    total_size=file_size,
+                                                    insrt_missing_taxa=True,
+                                                    glbl_chnk_cnt_start=glbl_chnk_cnt)
+        elif test_type == 3:
+            # after ingesting Biolink categories, need to ingest OrganismTaxon
+            # first!
+            for file_name in TEST_3_COMPENDIA:
+                file_size = compendia_map_names[file_name].size
+                print(f"ingesting compendia file: {file_name}")
+                elapsed_time_str = su.format_time_seconds_to_str(time.time() -
+                                                                 start_time_sec)
+                print(f"at elapsed time: {elapsed_time_str}; "
+                      f"starting ingest of compendia file: {file_name}; "
+                      f"file size: {file_size} bytes")
+                if not dry_run:
+                    glbl_chnk_cnt = \
+                        _ingest_compendia_jsonl_url(babel_compendia_url + file_name,
+                                                    conn=conn,
+                                                    chunk_size=chunk_size,
+                                                    log_work=log_work,
+                                                    total_size=file_size,
+                                                    insrt_missing_taxa=False,
+                                                    glbl_chnk_cnt_start=glbl_chnk_cnt)
+            for file_name in TEST_3_CONFLATION:
+                print(f"ingesting conflation file: {file_name}")
+                assert file_name.endswith(CONFLATION_FILE_SUFFIX), \
+                    f"unexpected entry in conflation file index: {file_name}"
+                conflation_type_name = file_name[0:(len(file_name) - \
+                                                    len(CONFLATION_FILE_SUFFIX))]
+                if conflation_type_name not in CONFLATION_TYPE_NAMES_IDS:
+                    raise ValueError(f"unknown conflation filename: {file_name}")
+                file_size = conflation_map_names[file_name].size
+                conflation_type_id = CONFLATION_TYPE_NAMES_IDS[conflation_type_name]
+                elapsed_time_str = su.format_time_seconds_to_str(time.time() -
+                                                                 start_time_sec)
+                print(f"at elapsed time: {elapsed_time_str}; "
+                      f"starting ingest of conflation file: {file_name}; "
+                      f"file size: {file_size} bytes")
+                if not dry_run:
+                    glbl_chnk_cnt = \
+                        _ingest_conflation_file_url(babel_conflation_url + file_name,
+                                                    conn=conn,
+                                                    chunk_size=chunk_size,
+                                                    conflation_type_id=conflation_type_id,
+                                                    log_work=log_work,
+                                                    total_size=file_size,
+                                                    glbl_chnk_cnt_start=glbl_chnk_cnt)
         else:
             assert test_type is None, f"invalid test_type: {test_type}"
-            start_time = time.time()
             print(f"ingesting compendia files at: {babel_compendia_url}")
-            for file_entry in sorted_files:
-                file_name = file_entry.name
-                file_size = file_entry.size
-                cur_time = time.time()
-                elapsed_time_str = convert_sec(cur_time - start_time)
+            for file_name in compendia_sorted_files:
+                file_size = compendia_map_names[file_name].size
+                elapsed_time_str = su.format_time_seconds_to_str(time.time() -
+                                                                 start_time_sec)
                 print(f"at elapsed time: {elapsed_time_str}; "
-                      f"starting ingest of file: {file_name}; "
+                      f"starting ingest of compendia file: {file_name}; "
                       f"file size: {file_size} bytes")
                 if not dry_run:
                     glbl_chnk_cnt = \
-                        _ingest_jsonl_url(babel_compendia_url +
-                                          file_name,
-                                          conn=conn,
-                                          chunk_size=chunk_size,
-                                          log_work=log_work,
-                                          total_size=file_size,
-                                          insrt_missing_taxa=True,
-                                          glbl_chnk_cnt_start=glbl_chnk_cnt)
-        conn.execute("PRAGMA wal_checkpoint(FULL);")
-        conn.execute("PRAGMA journal_mode = DELETE;")
+                        _ingest_compendia_jsonl_url(babel_compendia_url +
+                                                    file_name,
+                                                    conn=conn,
+                                                    chunk_size=chunk_size,
+                                                    log_work=log_work,
+                                                    total_size=file_size,
+                                                    insrt_missing_taxa=True,
+                                                    glbl_chnk_cnt_start=glbl_chnk_cnt)
+            print(f"ingesting conflation files at: {babel_conflation_url}")
+            for file_name in conflation_sorted_files:
+                assert file_name.endswith(CONFLATION_FILE_SUFFIX), \
+                    f"unexpected entry in conflation file index: {file_name}"
+                conflation_type_name = file_name[0:(len(file_name) - \
+                                                    len(CONFLATION_FILE_SUFFIX))]
+                if conflation_type_name not in CONFLATION_TYPE_NAMES_IDS:
+                    raise ValueError(f"unknown conflation filename: {file_name}")
+                file_size = conflation_map_names[file_name].size
+                conflation_type_id = CONFLATION_TYPE_NAMES_IDS[conflation_type_name]
+                elapsed_time_str = su.format_time_seconds_to_str(time.time() -
+                                                                 start_time_sec)
+                print(f"at elapsed time: {elapsed_time_str}; "
+                      f"starting ingest of conflation file: {file_name}; "
+                      f"file size: {file_size} bytes")
+                if not dry_run:
+                    glbl_chnk_cnt = \
+                        _ingest_conflation_file_url(babel_conflation_url +
+                                                    file_name,
+                                                    conn=conn,
+                                                    chunk_size=chunk_size,
+                                                    conflation_type_id=conflation_type_id,
+                                                    log_work=log_work,
+                                                    total_size=file_size,
+                                                    glbl_chnk_cnt_start=glbl_chnk_cnt)
+        _set_pragmas_for_querying(conn)
         _set_auto_vacuum(conn, True)
-        if log_work:
-            final_cleanup_start_time = time.time()
-        conn.execute("ANALYZE")
-        conn.execute("VACUUM")
-        if log_work:
-            final_cleanup_end_time = time.time()
-            final_cleanup_elapsed_time = convert_sec(final_cleanup_end_time -
-                                                     final_cleanup_start_time)
-            print("running ANALYZE and VACUUM (final cleanup) took: "
-                  f"{final_cleanup_elapsed_time} (HHH:MM::SS)")
-    date_time_local = _cur_datetime_local_no_ms().isoformat()
-    print(f"Finished database ingest at: {date_time_local}")
-    print(f"Total number of chunks inserted: {glbl_chnk_cnt}")
-    elapsed_time_str = convert_sec(time.time() - start_time_sec)
-    print(f"Elapsed time for Babel ingest: {elapsed_time_str} (HHH:MM::SS)")
+        _do_final_cleanup(conn,
+                          log_work,
+                          glbl_chnk_cnt,
+                          start_time_sec)
 
 
 if __name__ == "__main__":

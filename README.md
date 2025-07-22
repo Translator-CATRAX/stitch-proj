@@ -17,7 +17,7 @@ Some tools for building a Translator BigKG (experimental! not yet finished!)
 - `c7g.4xlarge` instance (Graviton3 processor), 32 GiB of memory
 - `gp3` root volume (24 GiB)
 - `io1` data volume (400 GiB); mounted with `noatime` (standard 3000 IOPS and 125 MiBS)
-- The following packages `apt` installed: 
+- The following packages need to be `apt` installed: 
   - `sqlite3`
   - `build-essential` 
   - `gcc` 
@@ -48,7 +48,7 @@ Some tools for building a Translator BigKG (experimental! not yet finished!)
   - `pkg-config` 
   - `cmake`
   - `python3.12-venv`
-- CPython, Numpy, and Pandas compiled locally using gcc/g++ with the following CFLAGS:
+- CPython, Numpy, and Pandas need to be compiled locally using gcc/g++ with the following CFLAGS:
 ```-mcpu=neoverse-v1 -mtune=neoverse-v1 -march=armv8.4-a+crypto -O3 -pipe```
 
 ## MacOS
@@ -87,12 +87,13 @@ Note, the `ingest_babel.py` script does not ingest the Babel `conflation` files
 in the big KG, rather than to conflate gene/protein concept nodes and conflate
 chemical/drug concept nodes.
 
-# Running the type checks and lint checks:
+# Running the type checks, lint checks, and unit tests:
 These checks should be run before any commit:
 ```
 ./run-checks.sh
 ```
-which will run type checks (using `mypy`) and code lint checks (using `ruff`).
+which will run type checks (using `mypy`), lint checks (using `ruff`),
+and unit tests (using `pytest`).
 
 # Schema
 This schema diagram was generated using DbVisualizer Free version 24.3.3.
@@ -117,11 +118,21 @@ https://github.com/Translator-CATRAX/stitch/issues/16
 
 1. When you create a connection, make sure to set `PRAGMA foreign_keys = ON;`
 
-
-# How to run the test suite
-
+# How to run the unit test suite
 ```
 cd stitch
 source venv/bin/activate
-pytest
+pytest -v
 ```
+
+# How to regenerate the schema digram
+
+Use the `ingest_babel.py` script to generate the `ddl.sql` file as follows: ```
+source venv/bin/activate python3 stitch/ingest_babel.sql --print-ddl --dry-run
+2>ddl.sql ``` On macOS, run the DbVisualizer application (free version
+24.3.3). Under the "File" menu select "Open File...", then navigate to the new
+`ddl.sql` file.  In the treeview control under "SQLite" on the left, open
+"Schema" and click on "Tables". In the "Tables" view in the main application
+pane, click on the "References" tab. Use macOS system screen-capture tool to
+obtain a PNG of the schema diagram.
+

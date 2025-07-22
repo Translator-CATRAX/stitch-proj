@@ -2,7 +2,6 @@
 import multiprocessing
 import pprint
 import sqlite3
-import time
 
 import pytest
 from stitch.local_babel import (
@@ -74,9 +73,9 @@ def test_map_curies_to_preferred_curies(db_filename: str):
 def test_map_curies_to_preferred_curies_big(db_filename: str):
     with multiprocessing.Pool(processes=4) as pool:
         curies = get_n_random_curies(db_filename, 1000, pool)
-        start = time.time()
+        assert len(curies)==1000
         mapped = map_curies_to_preferred_curies(db_filename, curies, pool)
-        end = time.time()
     assert isinstance(mapped, tuple)
-    assert len(mapped) <= len(curies)  # some mappings may fail
-    print(f"Mapped {len(mapped)} of {len(curies)} curies in {end - start:.2f}s")
+    unique_ids_mapped = tuple(set(row[2] for row in mapped))
+    assert len(unique_ids_mapped) <= len(curies)
+

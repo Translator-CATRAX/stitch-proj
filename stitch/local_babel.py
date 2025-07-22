@@ -14,7 +14,7 @@ from typing import Optional, TypeAlias, TypedDict
 
 # define the type aliases that we need for brevity
 MultProcPool: TypeAlias = multiprocessing.pool.Pool
-CurieAndType: TypeAlias = tuple[str, str]
+CurieCurieAndType: TypeAlias = tuple[str, str, str]
 
 
 class IdentifierInfo(TypedDict):
@@ -45,14 +45,16 @@ def _chunk_tuple[T](x: tuple[T, ...], chunk_size: int) -> tuple[tuple[T, ...], .
 
 
 def connect_to_db_read_only(db_filename: str) -> sqlite3.Connection:
-    return sqlite3.connect("file:" + db_filename + "?mode=ro",
+    conn = sqlite3.connect("file:" + db_filename + "?mode=ro",
                            uri=True)
+    conn.execute('PRAGMA foreign_keys = ON;')
+    return conn
 
 
 def _map_curies_to_preferred_curies(db_filename: str,
                                     curie_chunk: tuple[str, ...]) -> \
-                                    tuple[CurieAndType, ...]:
-    s = """SELECT prim_identif.curie, types.curie
+                                    tuple[CurieCurieAndType, ...]:
+    s = """SELECT prim_identif.curie, types.curie, identifiers.curie
 FROM (((identifiers as prim_identif 
 INNER JOIN cliques ON prim_identif.id = cliques.primary_identifier_id) 
 INNER JOIN identifiers_cliques AS idcl ON cliques.id = idcl.clique_id) 
@@ -61,7 +63,7 @@ INNER JOIN types on types.id = cliques.type_id
 WHERE identifiers.curie = ?;"""  # noqa W291   
     with connect_to_db_read_only(db_filename) as db_conn:
         cursor = db_conn.cursor()
-        res = tuple((row[0], row[1])
+        res = tuple((row[0], row[1], row[2])
                     for curie in curie_chunk
                     for row in cursor.execute(s, (curie,)).fetchall())
     return res
@@ -70,16 +72,14 @@ WHERE identifiers.curie = ?;"""  # noqa W291
 def map_curies_to_preferred_curies(db_filename: str,
                                    curies: tuple[str, ...],
                                    pool: Optional[MultProcPool] = None) -> \
-                                   tuple[CurieAndType, ...]:
+                                   tuple[CurieCurieAndType, ...]:
     processor = functools.partial(_map_curies_to_preferred_curies,
                                   db_filename)
     # the comment "type: ignore[attr-defined]" below is needed in order to
     # quiet an otherwise unavoidable mypy error:
     num_workers = pool._processes if pool else 1   # type: ignore[attr-defined]
-    print(f"num workers: {num_workers}")
     chunk_size = min(max(1, math.floor(len(curies) / num_workers)),
                      MAX_IDENTIFIERS_PER_STRING_SQLITE)
-    print(f"chunk size: {chunk_size}")
     mapper = pool.imap if pool else map
     chunks = _chunk_tuple(curies, chunk_size)
     return tuple(itertools.chain.from_iterable(mapper(processor, chunks)))
