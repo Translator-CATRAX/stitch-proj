@@ -858,10 +858,13 @@ def _customize_temp_dir(temp_dir: str,
     os.environ["SQLITE_TMPDIR"] = temp_dir
     if not no_exec:
         python_exe = sys.executable
-        new_args = [python_exe, sys.argv[0], *sys.argv[1:], "--no-exec"]
+        exe_args = [python_exe]
+        if sys.flags.unbuffered:
+            exe_args.append("-u")
+        new_args = exe_args + [sys.argv[0], *sys.argv[1:], "--no-exec"]
         os.execve(python_exe, new_args, os.environ.copy())
-        os.environ["RAY_TMPDIR"] = temp_dir
-        tempfile.tempdir = temp_dir
+    os.environ["RAY_TMPDIR"] = temp_dir
+    tempfile.tempdir = temp_dir
     if not quiet:
         print(f"Setting temp dir to: {temp_dir}")
 
