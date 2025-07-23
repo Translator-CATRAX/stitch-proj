@@ -53,7 +53,7 @@ DEFAULT_DATABASE_FILE_NAME = 'babel.sqlite'
 
 DEFAULT_TEST_TYPE = None
 DEFAULT_TEST_FILE = "test-tiny.jsonl"
-DEFAULT_CHUNK_SIZE = 100000
+DEFAULT_CHUNK_SIZE = 100_000
 WAL_SIZE = 1000
 
 
@@ -569,7 +569,7 @@ def _byte_count_chunk(chunk: pd.core.frame.DataFrame|list[str]) -> int:
            else chunk
     return len(json.dumps(dumpable))
 
-ROWS_PER_ANALYZE = 100000000
+ROWS_PER_ANALYZE = 10_000_000
 ROWS_PER_VACUUM = 100 * ROWS_PER_ANALYZE  # left operand must be integer > 0
 
 
