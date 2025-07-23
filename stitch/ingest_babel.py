@@ -274,10 +274,10 @@ SQL_CREATE_TABLE_CONFLATION_MEMBERS = \
     '''
         CREATE TABLE conflation_members (
         cluster_id INTEGER NOT NULL,
-        curie_id INTEGER NOT NULL,
+        identifier_id INTEGER NOT NULL,
         FOREIGN KEY(cluster_id) REFERENCES conflation_clusters(id),
-        FOREIGN KEY(curie_id) REFERENCES identifiers(id),
-        UNIQUE(cluster_id, curie_id))
+        FOREIGN KEY(identifier_id) REFERENCES identifiers(id),
+        UNIQUE(cluster_id, identifier_id))
     '''
 
 SQL__CREATE_INDEX_WORK_PLAN = \
@@ -289,7 +289,7 @@ SQL__CREATE_INDEX_WORK_PLAN = \
      ('identifiers_cliques',      'clique_id'),
      ('identifiers_taxa',         'identifier_id'),
      ('identifiers_taxa',         'taxa_identifier_id'),
-     ('conflation_members',       'curie_id'),
+     ('conflation_members',       'identifier_id'),
      ('conflation_clusters',      'type'))
 
 def _create_empty_database(database_file_name: str,
@@ -611,7 +611,8 @@ def _make_conflation_chunk_processor(conn: sqlite3.Connection,
             ids = conn.execute(query, curie_list).fetchall()
             insert_data = tuple((cluster_id, curie_id_tuple[0]) for \
                                 curie_id_tuple in ids)
-            cursor.executemany("INSERT INTO conflation_members (cluster_id, curie_id) "
+            cursor.executemany("INSERT INTO conflation_members "
+                               "(cluster_id, identifier_id) "
                                "VALUES (?, ?);",
                                insert_data)
     return _process_conflation_chunk
