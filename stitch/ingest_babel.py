@@ -256,11 +256,8 @@ SQL_CREATE_TABLE_IDENTIFIERS_TAXA = \
 
 COMPENDIA_FILE_SUFFIX = '.txt'
 CONFLATION_FILE_SUFFIX = '.txt'
-CONFLATION_TYPE_NAMES_IDS = \
-    {'DrugChemical': 1,
-     'GeneProtein': 2}
 
-ALLOWED_CONFLATION_TYPES = set(CONFLATION_TYPE_NAMES_IDS.values())
+ALLOWED_CONFLATION_TYPES = set(su.CONFLATION_TYPE_NAMES_IDS.values())
 
 SQL_CREATE_TABLE_CONFLATION_CLUSTERS = \
     f'''
@@ -972,10 +969,10 @@ def main(babel_compendia_url: str,
                     f"unexpected entry in conflation file index: {file_name}"
                 conflation_type_name = file_name[0:(len(file_name) - \
                                                     len(CONFLATION_FILE_SUFFIX))]
-                if conflation_type_name not in CONFLATION_TYPE_NAMES_IDS:
+                if conflation_type_name not in su.CONFLATION_TYPE_NAMES_IDS:
                     raise ValueError(f"unknown conflation filename: {file_name}")
                 file_size = conflation_map_names[file_name].size
-                conflation_type_id = CONFLATION_TYPE_NAMES_IDS[conflation_type_name]
+                conflation_type_id = su.CONFLATION_TYPE_NAMES_IDS[conflation_type_name]
                 elapsed_time_str = su.format_time_seconds_to_str(time.time() -
                                                                  start_time_sec)
                 print(f"at elapsed time: {elapsed_time_str}; "
@@ -1016,10 +1013,10 @@ def main(babel_compendia_url: str,
                     f"unexpected entry in conflation file index: {file_name}"
                 conflation_type_name = file_name[0:(len(file_name) - \
                                                     len(CONFLATION_FILE_SUFFIX))]
-                if conflation_type_name not in CONFLATION_TYPE_NAMES_IDS:
+                if conflation_type_name not in su.CONFLATION_TYPE_NAMES_IDS:
                     raise ValueError(f"unknown conflation filename: {file_name}")
                 file_size = conflation_map_names[file_name].size
-                conflation_type_id = CONFLATION_TYPE_NAMES_IDS[conflation_type_name]
+                conflation_type_id = su.CONFLATION_TYPE_NAMES_IDS[conflation_type_name]
                 elapsed_time_str = su.format_time_seconds_to_str(time.time() -
                                                                  start_time_sec)
                 print(f"at elapsed time: {elapsed_time_str}; "
