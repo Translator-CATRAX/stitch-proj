@@ -29,6 +29,7 @@ import sqlite3
 import sys
 import tempfile
 import time
+import urllib.parse
 from datetime import datetime
 from typing import IO, Callable, Generator, Iterable, Optional, cast
 
@@ -45,10 +46,11 @@ from htmllistparse import htmllistparse
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from stitch import stitchutils as su
 
-DEFAULT_BABEL_COMPENDIA_URL = \
-    'https://stars.renci.org/var/babel_outputs/2025mar31/compendia/'
-DEFAULT_BABEL_CONFLATION_URL = \
-    'https://stars.renci.org/var/babel_outputs/2025mar31/conflation/'
+DEFAULT_BABEL_RELEASE_URL =  'https://stars.renci.org/var/babel_outputs/2025mar31'
+DEFAULT_BABEL_COMPENDIA_URL = urllib.parse.urljoin(DEFAULT_BABEL_RELEASE_URL,
+                                                   'compendia/')
+DEFAULT_BABEL_CONFLATION_URL = urllib.parse.urljoin(DEFAULT_BABEL_RELEASE_URL,
+                                                    'conflation/')
 DEFAULT_DATABASE_FILE_NAME = 'babel.sqlite'
 
 DEFAULT_TEST_TYPE = None
