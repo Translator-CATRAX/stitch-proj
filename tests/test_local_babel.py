@@ -1,4 +1,3 @@
-
 import multiprocessing
 import pprint
 import sqlite3
@@ -8,6 +7,7 @@ from stitch.local_babel import (
     connect_to_db_read_only,
     get_n_random_curies,
     map_any_curie_to_cliques,
+    map_curie_to_conflation_curies,
     map_curies_to_preferred_curies,
     map_pref_curie_to_synonyms,
     map_preferred_curie_to_cliques,
@@ -18,6 +18,10 @@ from stitch.local_babel import (
 def db_filename() -> str:
     return "db/babel-20250123.sqlite"
 
+@pytest.fixture(scope="session")
+def db_filename_test3() -> str:
+    return "db/babel-test3.sqlite"
+
 @pytest.fixture(scope="function")
 def pool():
     with multiprocessing.Pool(processes=10) as p:
@@ -26,6 +30,11 @@ def pool():
 @pytest.fixture(scope="function")
 def readonly_conn(db_filename):
     with connect_to_db_read_only(db_filename) as conn:
+        yield conn
+
+@pytest.fixture(scope="function")
+def conn_test3(db_filename_test3):
+    with connect_to_db_read_only(db_filename_test3) as conn:
         yield conn
 
 def test_get_n_random_curies(db_filename: str):
@@ -78,4 +87,9 @@ def test_map_curies_to_preferred_curies_big(db_filename: str):
     assert isinstance(mapped, tuple)
     unique_ids_mapped = tuple(set(row[2] for row in mapped))
     assert len(unique_ids_mapped) <= len(curies)
+
+def test_map_curie_to_conflation_curies(conn_test3: sqlite3.Connection):
+    curies = map_curie_to_conflation_curies(conn_test3, "RXCUI:1014098", 1)
+    assert len(curies) >= 14
+
 

@@ -55,10 +55,10 @@
 
         CREATE TABLE conflation_members (
         cluster_id INTEGER NOT NULL,
-        curie_id INTEGER NOT NULL,
+        identifier_id INTEGER NOT NULL,
         FOREIGN KEY(cluster_id) REFERENCES conflation_clusters(id),
-        FOREIGN KEY(curie_id) REFERENCES identifiers(id),
-        UNIQUE(cluster_id, curie_id))
+        FOREIGN KEY(identifier_id) REFERENCES identifiers(id),
+        UNIQUE(cluster_id, identifier_id))
     
 CREATE INDEX idx_cliques_type_id ON cliques (type_id);
 CREATE INDEX idx_cliques_primary_identifier_id ON cliques (primary_identifier_id);
@@ -68,5 +68,5 @@ CREATE INDEX idx_identifiers_cliques_identifier_id ON identifiers_cliques (ident
 CREATE INDEX idx_identifiers_cliques_clique_id ON identifiers_cliques (clique_id);
 CREATE INDEX idx_identifiers_taxa_identifier_id ON identifiers_taxa (identifier_id);
 CREATE INDEX idx_identifiers_taxa_taxa_identifier_id ON identifiers_taxa (taxa_identifier_id);
-CREATE INDEX idx_conflation_members_curie_id ON conflation_members (curie_id);
+CREATE INDEX idx_conflation_members_identifier_id ON conflation_members (identifier_id);
 CREATE INDEX idx_conflation_clusters_type ON conflation_clusters (type);

@@ -51,6 +51,26 @@ def connect_to_db_read_only(db_filename: str) -> sqlite3.Connection:
     return conn
 
 
+def map_curie_to_conflation_curies(conn: sqlite3.Connection,
+                                   curie: str,
+                                   conflation_type: int) -> tuple[str]:
+    s = """SELECT id1.curie
+    FROM identifiers AS id1
+    INNER JOIN conflation_members AS cm1
+    ON cm1.identifier_id = id1.id
+    INNER JOIN conflation_members AS cm2
+    ON cm2.cluster_id = cm1.cluster_id
+    INNER JOIN identifiers AS id2
+    ON id2.id = cm2.identifier_id
+    INNER JOIN conflation_clusters
+    ON cm2.cluster_id = conflation_clusters.id
+    WHERE conflation_clusters.type = ?
+    AND id2.curie = ?
+    AND id1.curie <> id2.curie;
+    """ # noqa W291
+    res = conn.cursor().execute(s, (conflation_type, curie)).fetchall()
+    return tuple(row[0] for row in res)
+
 def _map_curies_to_preferred_curies(db_filename: str,
                                     curie_chunk: tuple[str, ...]) -> \
                                     tuple[CurieCurieAndType, ...]:
