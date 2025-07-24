@@ -91,5 +91,6 @@ def test_map_curies_to_preferred_curies_big(db_filename: str):
 def test_map_curie_to_conflation_curies(conn_test3: sqlite3.Connection):
     curies = map_curie_to_conflation_curies(conn_test3, "RXCUI:1014098", 1)
     assert len(curies) >= 14
-
+    curies = map_curie_to_conflation_curies(conn_test3, "XYZZY:533234", 1)
+    assert not curies
 
