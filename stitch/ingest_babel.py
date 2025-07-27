@@ -568,7 +568,7 @@ def _byte_count_chunk(chunk: pd.core.frame.DataFrame|list[str]) -> int:
            else chunk
     return len(json.dumps(dumpable))
 
-ROWS_PER_ANALYZE = 10_000_000
+ROWS_PER_ANALYZE = 50_000_000
 ROWS_PER_VACUUM = 100 * ROWS_PER_ANALYZE  # left operand must be integer > 0
 
 
