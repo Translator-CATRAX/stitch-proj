@@ -8,6 +8,7 @@ from stitch.local_babel import (
     get_n_random_curies,
     map_any_curie_to_cliques,
     map_curie_to_conflation_curies,
+    map_curies_to_conflation_curies,
     map_curies_to_preferred_curies,
     map_pref_curie_to_synonyms,
     map_preferred_curie_to_cliques,
@@ -93,4 +94,13 @@ def test_map_curie_to_conflation_curies(conn_test3: sqlite3.Connection):
     assert len(curies) >= 14
     curies = map_curie_to_conflation_curies(conn_test3, "XYZZY:533234", 1)
     assert not curies
+
+def test_map_curies_to_conflation_curies(db_filename_test3: str):
+    with multiprocessing.Pool(processes=4) as pool:
+        curies = map_curies_to_conflation_curies(db_filename_test3,
+                                                 ("RXCUI:1014098",
+                                                  "XYZZY:533234",
+                                                  "RXCUI:1014098"),
+                                                 pool)
+    assert len(curies) >= 28
 

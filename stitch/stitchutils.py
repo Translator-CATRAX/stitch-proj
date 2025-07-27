@@ -7,6 +7,9 @@ import bmt
 import numpy as np
 import requests
 
+CONFLATION_TYPE_NAMES_IDS = \
+    {'DrugChemical': 1,
+     'GeneProtein': 2}
 
 def get_biolink_categories(log_work: bool = False) -> set[str]:
     tk = bmt.Toolkit()

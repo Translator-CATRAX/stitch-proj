@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -o nounset -o pipefail -o errexit
 
-run_mypy_cmd="mypy --ignore-missing-imports"
-run_ruff_cmd="ruff check"
+run_mypy_cmd="venv/bin/mypy --ignore-missing-imports"
+run_ruff_cmd="venv/bin/ruff check"
 
 files_to_check=(stitch/local_babel.py
                 stitch/ingest_babel.py
@@ -19,4 +19,4 @@ for file in "${files_to_check[@]}"; do
 done
 
 echo "Running full pytest unit test suite"
-pytest -v
+venv/bin/pytest -v
