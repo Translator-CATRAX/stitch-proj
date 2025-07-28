@@ -50,9 +50,12 @@ def test_map_any_curie_to_cliques(readonly_conn: sqlite3.Connection):
     curie = "MESH:D014867"
     results = map_any_curie_to_cliques(readonly_conn, curie)
     assert isinstance(results, tuple)
-    for item in results:
-        assert "id" in item
-        assert "type" in item
+    for row in results:
+        assert "id" in row
+        assert "type" in row
+        assert "ic" in row
+        assert isinstance(row['ic'], float)
+        assert isinstance(row['type'], list)
 
 
 def test_map_pref_curie_to_synonyms(readonly_conn: sqlite3.Connection):

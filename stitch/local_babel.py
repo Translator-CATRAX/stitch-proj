@@ -10,7 +10,7 @@ import multiprocessing.pool
 import operator
 import random
 import sqlite3
-from typing import Optional, TypeAlias, TypedDict
+from typing import Optional, TypeAlias, TypedDict, TypeVar
 
 # define the type aliases that we need for brevity
 MultProcPool: TypeAlias = multiprocessing.pool.Pool
@@ -37,7 +37,8 @@ MAX_IDENTIFIERS_PER_STRING_SQLITE = 1000
 # polymorphism; T will have be whatever type the user passes
 # to the function
 
-def _chunk_tuple[T](x: tuple[T, ...], chunk_size: int) -> tuple[tuple[T, ...], ...]:
+T = TypeVar("T")
+def _chunk_tuple(x: tuple[T, ...], chunk_size: int) -> tuple[tuple[T, ...], ...]:
     it = iter(x)
     return tuple(
         tuple(itertools.islice(it, chunk_size))
@@ -55,8 +56,8 @@ def _map_curies_to_conflation_curies(db_filename: str,
                                      curie_chunk: tuple[str, ...],
                                      pool: Optional[MultProcPool] = None) -> \
                                      tuple[CurieCurieAndInt, ...]:
-    s = """SELECT id2.curie, id1.curie,
-    conflation_clusters.type
+    s = """
+SELECT id2.curie, id1.curie, conflation_clusters.type
 FROM identifiers AS id1
 INNER JOIN conflation_members AS cm1
 ON cm1.identifier_id = id1.id
@@ -96,7 +97,8 @@ def map_curies_to_conflation_curies(db_filename: str,
 def map_curie_to_conflation_curies(conn: sqlite3.Connection,
                                    curie: str,
                                    conflation_type: int) -> tuple[str]:
-    s = """SELECT id1.curie
+    s = """
+SELECT id1.curie
 FROM identifiers AS id1
 INNER JOIN conflation_members AS cm1
 ON cm1.identifier_id = id1.id
@@ -116,11 +118,12 @@ AND id1.curie <> id2.curie;
 def _map_curies_to_preferred_curies(db_filename: str,
                                     curie_chunk: tuple[str, ...]) -> \
                                     tuple[CurieCurieAndType, ...]:
-    s = """SELECT prim_identif.curie, types.curie, identifiers.curie
-FROM (((identifiers as prim_identif 
-INNER JOIN cliques ON prim_identif.id = cliques.primary_identifier_id) 
-INNER JOIN identifiers_cliques AS idcl ON cliques.id = idcl.clique_id) 
-INNER JOIN identifiers on idcl.identifier_id = identifiers.id)
+    s = """
+SELECT prim_identif.curie, types.curie, identifiers.curie
+FROM identifiers as prim_identif 
+INNER JOIN cliques ON prim_identif.id = cliques.primary_identifier_id 
+INNER JOIN identifiers_cliques AS idcl ON cliques.id = idcl.clique_id 
+INNER JOIN identifiers on idcl.identifier_id = identifiers.id
 INNER JOIN types on types.id = cliques.type_id
 WHERE identifiers.curie = ?;"""  # noqa W291   
     with connect_to_db_read_only(db_filename) as db_conn:
@@ -149,13 +152,14 @@ def map_curies_to_preferred_curies(db_filename: str,
 
 def map_preferred_curie_to_cliques(conn: sqlite3.Connection,
                                    curie: str) -> tuple[CliqueInfo, ...]:
-    s = """SELECT prim_identif.curie, types.curie, cliques.ic, desc.desc,
+    s = """
+SELECT prim_identif.curie, types.curie, cliques.ic, descrip.desc,
 cliques.preferred_name
-FROM (((identifiers as prim_identif 
-INNER JOIN cliques ON prim_identif.id = cliques.primary_identifier_id) 
-INNER JOIN types on cliques.type_id = types.id)
-LEFT JOIN identifiers_descriptions as idd ON idd.identifier_id = prim_identif.id)
-INNER JOIN descriptions AS desc ON desc.id = idd.description_id
+FROM identifiers as prim_identif 
+INNER JOIN cliques ON prim_identif.id = cliques.primary_identifier_id 
+INNER JOIN types on cliques.type_id = types.id
+LEFT JOIN identifiers_descriptions as idd ON idd.identifier_id = prim_identif.id
+LEFT JOIN descriptions AS descrip ON descrip.id = idd.description_id
 WHERE prim_identif.curie = ?;"""  # noqa W291
     rows = conn.execute(s, (curie,)).fetchall()
     return tuple({'id': {'identifier': row[0],
@@ -167,16 +171,16 @@ WHERE prim_identif.curie = ?;"""  # noqa W291
 
 def map_any_curie_to_cliques(conn: sqlite3.Connection,
                              curie: str) -> tuple[CliqueInfo, ...]:
-    s = """SELECT prim_identif.curie, types.curie, cliques.ic, desc.desc,
-cliques.preferred_name
-FROM (((((identifiers as prim_identif 
-INNER JOIN cliques ON prim_identif.id = cliques.primary_identifier_id) 
-INNER JOIN identifiers_cliques AS idcl ON cliques.id = idcl.clique_id) 
-INNER JOIN identifiers on idcl.identifier_id = identifiers.id)
-INNER JOIN types on cliques.type_id = types.id)
-LEFT JOIN identifiers_descriptions as idd ON idd.identifier_id = prim_identif.id)
-INNER JOIN descriptions AS desc ON desc.id = idd.description_id
-WHERE identifiers.curie = ?;"""  # noqa W291
+    s = """
+SELECT prim_identif.curie, types.curie, cliques.ic, descrip.desc, cliques.preferred_name
+FROM identifiers as prim_identif 
+INNER JOIN cliques ON prim_identif.id = cliques.primary_identifier_id 
+INNER JOIN identifiers_cliques AS idcl ON cliques.id = idcl.clique_id 
+INNER JOIN identifiers as sec_identif on idcl.identifier_id = sec_identif.id
+INNER JOIN types on cliques.type_id = types.id
+LEFT JOIN identifiers_descriptions as idd ON idd.identifier_id = prim_identif.id
+LEFT JOIN descriptions AS descrip ON descrip.id = idd.description_id
+WHERE sec_identif.curie = ?;"""  # noqa W291
     rows = conn.execute(s, (curie,)).fetchall()
     return tuple({'id': {'identifier': row[0],
                          'description': row[3],
@@ -188,9 +192,9 @@ WHERE identifiers.curie = ?;"""  # noqa W291
 def map_pref_curie_to_synonyms(cursor: sqlite3.Cursor,
                                pref_curie: str) -> set[str]:
     s = """SELECT identifiers.curie
-FROM ((identifiers as prim_identif 
-INNER JOIN cliques ON prim_identif.id = cliques.primary_identifier_id) 
-INNER JOIN identifiers_cliques AS idcl ON cliques.id = idcl.clique_id) 
+FROM identifiers as prim_identif 
+INNER JOIN cliques ON prim_identif.id = cliques.primary_identifier_id 
+INNER JOIN identifiers_cliques AS idcl ON cliques.id = idcl.clique_id 
 INNER JOIN identifiers on idcl.identifier_id = identifiers.id
 WHERE prim_identif.curie = ?;"""  # noqa W291
     rows = cursor.execute(s, (pref_curie,)).fetchall()
