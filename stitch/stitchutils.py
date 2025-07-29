@@ -1,11 +1,12 @@
 import argparse
 import itertools
 import urllib
-from typing import Any, Iterator, TypeVar, Union, cast
+from typing import Any, Iterable, Iterator, TypeVar, Union, cast
 
 import bmt
 import numpy as np
 import requests
+import tempfile
 
 CONFLATION_TYPE_NAMES_IDS = \
     {'DrugChemical': 1,
@@ -41,7 +42,7 @@ def format_time_seconds_to_str(seconds: float) -> str:
     remaining_seconds: float = seconds % SECS_PER_MIN
     return f"{hours:03d}:{minutes:02d}:{remaining_seconds:02.0f}"
 
-def chunked(iterator: Iterator[str], size: int) -> Iterator[list[str]]:
+def chunked(iterator: Iterator[str], size: int) -> Iterable[list[str]]:
     """Yield successive chunks of `size` lines from an iterator."""
     while True:
         chunk = list(itertools.islice(iterator, size))
@@ -69,12 +70,21 @@ def get_lines_from_url(url_or_path: str) -> Iterator[str]:
             for line in f:
                 yield line.rstrip('\n')
     else:
-        response = requests.get(url_or_path, stream=True)
-        response.raise_for_status()
-        for line in response.iter_lines(decode_unicode=True):
-            yield line
+        # Download to a temporary file first, to avoid a ChunkedEncodingError
+        with tempfile.NamedTemporaryFile(mode='wb+', delete=True) as tmp_file:
+            with requests.get(url_or_path, stream=True, timeout=(10, 300)) as response:
+                response.raise_for_status()
+                for chunk in response.iter_content(chunk_size=8192):
+                    tmp_file.write(chunk)
+            tmp_file.flush()
+            tmp_file.seek(0)
 
-def get_line_chunks_from_url(url: str, chunk_size: int) -> Iterator[list[str]]:
+            # Now read from the temp file as text
+            with open(tmp_file.name, 'r', encoding='utf-8') as f:
+                for line in f:
+                    yield line.rstrip('\n')
+
+def get_line_chunks_from_url(url: str, chunk_size: int) -> Iterable[list[str]]:
     lines = get_lines_from_url(url)
     return chunked(lines, chunk_size)
 
