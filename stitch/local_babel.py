@@ -1,22 +1,20 @@
-#!/usr/bin/env python3
-
-# this requires python3.12
+#!/usr/bin/env python3.12
 
 import functools
 import itertools
-import math
 import multiprocessing
 import multiprocessing.pool
-import operator
 import random
 import sqlite3
-from typing import Optional, TypeAlias, TypedDict, TypeVar
+from typing import Callable, Iterable, Optional, TypeAlias, TypedDict, TypeVar
 
 # define the type aliases that we need for brevity
 MultProcPool: TypeAlias = multiprocessing.pool.Pool
 CurieCurieAndType: TypeAlias = tuple[str, str, str]
 CurieCurieAndInt: TypeAlias = tuple[str, str, int]
 
+T = TypeVar("T")
+R = TypeVar("R")
 
 class IdentifierInfo(TypedDict):
     description: str
@@ -37,23 +35,38 @@ MAX_IDENTIFIERS_PER_STRING_SQLITE = 1000
 # polymorphism; T will have be whatever type the user passes
 # to the function
 
-T = TypeVar("T")
-def _chunk_tuple(x: tuple[T, ...], chunk_size: int) -> tuple[tuple[T, ...], ...]:
+
+
+def _batch_tuple(x: tuple[T, ...], batch_size: int) -> tuple[tuple[T, ...], ...]:
     it = iter(x)
     return tuple(
-        tuple(itertools.islice(it, chunk_size))
-        for _ in range((len(x) + chunk_size - 1) // chunk_size)
+        tuple(itertools.islice(it, batch_size))
+        for _ in range((len(x) + batch_size - 1) // batch_size)
     )
 
+def _map_with_batching(
+    items: tuple[T, ...],
+    processor: Callable[[tuple[T, ...]], Iterable[R]],
+    pool: Optional[MultProcPool],
+    max_batch_size: int = MAX_IDENTIFIERS_PER_STRING_SQLITE
+) -> tuple[R, ...]:
+    num_workers = pool._processes if pool else 1  # type: ignore[attr-defined]
+    batch_size = min(max(1, len(items) // num_workers), max_batch_size)
+    batches = _batch_tuple(items, batch_size)
+    mapper = pool.imap if pool else map
+    return tuple(itertools.chain.from_iterable(mapper(processor, batches)))
 
 def connect_to_db_read_only(db_filename: str) -> sqlite3.Connection:
+    # opening with "?mode=ro" is compatible with multiple python processes
+    # reading the database at the same time, which we need for multiprocessing;
+    # this is why we are not opening the database file with "?immutable=1"
     conn = sqlite3.connect("file:" + db_filename + "?mode=ro",
                            uri=True)
     conn.execute('PRAGMA foreign_keys = ON;')
     return conn
 
 def _map_curies_to_conflation_curies(db_filename: str,
-                                     curie_chunk: tuple[str, ...],
+                                     curie_batch: Iterable[str],
                                      pool: Optional[MultProcPool] = None) -> \
                                      tuple[CurieCurieAndInt, ...]:
     s = """
@@ -73,7 +86,7 @@ AND id1.curie <> id2.curie;
     with connect_to_db_read_only(db_filename) as db_conn:
         cursor = db_conn.cursor()
         res = tuple((row[0], row[1], row[2])
-                    for curie in curie_chunk
+                    for curie in curie_batch
                     for row in cursor.execute(s, (curie,)).fetchall())
     return res
 
@@ -84,14 +97,7 @@ def map_curies_to_conflation_curies(db_filename: str,
                                     tuple[CurieCurieAndInt, ...]:
     processor = functools.partial(_map_curies_to_conflation_curies,
                                   db_filename)
-    # the comment "type: ignore[attr-defined]" below is needed in order to
-    # quiet an otherwise unavoidable mypy error:
-    num_workers = pool._processes if pool else 1   # type: ignore[attr-defined]
-    chunk_size = min(max(1, math.floor(len(curies) / num_workers)),
-                     MAX_IDENTIFIERS_PER_STRING_SQLITE)
-    mapper = pool.imap if pool else map
-    chunks = _chunk_tuple(curies, chunk_size)
-    return tuple(itertools.chain.from_iterable(mapper(processor, chunks)))
+    return _map_with_batching(curies, processor, pool)
 
 
 def map_curie_to_conflation_curies(conn: sqlite3.Connection,
@@ -116,7 +122,7 @@ AND id1.curie <> id2.curie;
     return tuple(row[0] for row in res)
 
 def _map_curies_to_preferred_curies(db_filename: str,
-                                    curie_chunk: tuple[str, ...]) -> \
+                                    curie_batch: Iterable[str]) -> \
                                     tuple[CurieCurieAndType, ...]:
     s = """
 SELECT prim_identif.curie, types.curie, identifiers.curie
@@ -129,10 +135,9 @@ WHERE identifiers.curie = ?;"""  # noqa W291
     with connect_to_db_read_only(db_filename) as db_conn:
         cursor = db_conn.cursor()
         res = tuple((row[0], row[1], row[2])
-                    for curie in curie_chunk
+                    for curie in curie_batch
                     for row in cursor.execute(s, (curie,)).fetchall())
     return res
-
 
 def map_curies_to_preferred_curies(db_filename: str,
                                    curies: tuple[str, ...],
@@ -140,14 +145,7 @@ def map_curies_to_preferred_curies(db_filename: str,
                                    tuple[CurieCurieAndType, ...]:
     processor = functools.partial(_map_curies_to_preferred_curies,
                                   db_filename)
-    # the comment "type: ignore[attr-defined]" below is needed in order to
-    # quiet an otherwise unavoidable mypy error:
-    num_workers = pool._processes if pool else 1   # type: ignore[attr-defined]
-    chunk_size = min(max(1, math.floor(len(curies) / num_workers)),
-                     MAX_IDENTIFIERS_PER_STRING_SQLITE)
-    mapper = pool.imap if pool else map
-    chunks = _chunk_tuple(curies, chunk_size)
-    return tuple(itertools.chain.from_iterable(mapper(processor, chunks)))
+    return _map_with_batching(curies, processor, pool)
 
 
 def map_preferred_curie_to_cliques(conn: sqlite3.Connection,
@@ -200,18 +198,16 @@ WHERE prim_identif.curie = ?;"""  # noqa W291
     rows = cursor.execute(s, (pref_curie,)).fetchall()
     return set(c[0] for c in rows)
 
-
 def _get_identifier_curies_by_int_id(db_filename: str,
-                                     id_batch: list[int]) -> list[str]:
-    conn = connect_to_db_read_only(db_filename)
-    cursor = conn.cursor()
-    placeholders = ",".join("?" for _ in id_batch)
-    query = f"SELECT curie FROM identifiers WHERE id IN ({placeholders})"
-    cursor.execute(query, id_batch)
-    result: list[str] = list(map(operator.itemgetter(0), cursor.fetchall()))
-    conn.close()
-    return result
-
+                                     id_batch: Iterable[int]) -> tuple[str, ...]:
+    with connect_to_db_read_only(db_filename) as conn:
+        id_batch_t = tuple(id_batch)
+        cursor = conn.cursor()
+        placeholders = ",".join("?" for _ in id_batch_t)
+        query = f"SELECT curie FROM identifiers WHERE id IN ({placeholders})"
+        cursor.execute(query, id_batch_t)
+        result: tuple[str] = tuple(row[0] for row in cursor.fetchall())
+        return result
 
 # This function is intended to be used for testing; it will grab CURIEs from `n`
 # rows of the `identifiers` table selected at random.
