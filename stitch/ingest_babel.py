@@ -33,6 +33,7 @@ import urllib.parse
 from datetime import datetime
 from typing import IO, Callable, Generator, Iterable, Optional, cast
 
+import numpy
 import pandas as pd
 import ray
 import swifter  # noqa: F401
@@ -164,22 +165,6 @@ def _do_index_analyze(conn: sqlite3.Connection,
             su.format_time_seconds_to_str(analyze_end_time -
                                           analyze_start_time)
         print(f"running ANALYZE took: {analyze_elapsed_time} "
-              "(HHH:MM::SS)")
-
-def _do_index_vacuum(conn: sqlite3.Connection,
-                     log_work: bool):
-    if log_work:
-        vacuum_start_time = time.time()
-    conn.execute("PRAGMA wal_checkpoint(FULL);")
-    conn.execute("PRAGMA journal_mode = DELETE;")
-    conn.execute("VACUUM;")
-    conn.execute("PRAGMA journal_mode = WAL;")
-    if log_work:
-        vacuum_end_time = time.time()
-        vacuum_elapsed_time = \
-            su.format_time_seconds_to_str(vacuum_end_time -
-                                          vacuum_start_time)
-        print(f"running VACUUM took: {vacuum_elapsed_time} "
               "(HHH:MM::SS)")
 
 def _set_auto_vacuum(conn: sqlite3.Connection,
@@ -564,13 +549,16 @@ def _ingest_biolink_categories(biolink_categories: set[str],
 
 def _byte_count_chunk(chunk: pd.core.frame.DataFrame|list[str]) -> int:
     dumpable = chunk.to_dict(orient='records') \
-        if type(chunk) is pd.core.frame.DataFrame \
+        if isinstance(chunk, pd.core.frame.DataFrame) \
            else chunk
     return len(json.dumps(dumpable))
 
-ROWS_PER_ANALYZE = 50_000_000
-ROWS_PER_VACUUM = 100 * ROWS_PER_ANALYZE  # left operand must be integer > 0
-
+ROWS_PER_ANALYZE = (1_000_000,
+                    3_000_000,
+                    10_000_000,
+                    30_000_000,
+                    100_000_000,
+                    300_000_000)
 
 def _read_conflation_file_in_chunks(file_path: str, chunk_size: int) -> \
         Generator[list[list[str]], None, None]:
@@ -628,8 +616,9 @@ def _ingest_conflation_file_url(url: str,
     process_chunk = _make_conflation_chunk_processor(conn,
                                                      conflation_type_id)
     chunk_ctr = 0
-    chunks_per_analyze = math.ceil(ROWS_PER_ANALYZE / chunk_size)
-    chunks_per_vacuum = math.ceil(ROWS_PER_VACUUM / chunk_size)
+    chunks_per_analyze_list: list[int] = [int(x) for x in \
+                                          numpy.ceil(numpy.array(ROWS_PER_ANALYZE) / \
+                                                     chunk_size)]
     for chunk in su.get_line_chunks_from_url(url, chunk_size):
         chunk_ctr += 1
         try:
@@ -665,12 +654,10 @@ def _ingest_conflation_file_url(url: str,
                           f"; time to complete file: {time_to_complete_str}")
                 else:
                     print("\n")
-            if (chunk_ctr + glbl_chnk_cnt_start) % \
-               chunks_per_analyze == 0:
+            if any((chunk_ctr + glbl_chnk_cnt_start) % \
+                   chunks_per_analyze == 0 \
+                   for chunks_per_analyze in chunks_per_analyze_list):
                 _do_index_analyze(conn, log_work)
-                if (chunk_ctr + glbl_chnk_cnt_start) % \
-                   chunks_per_vacuum == 0:
-                    _do_index_vacuum(conn, log_work)
         except Exception as e:
             conn.rollback()
             raise e
@@ -684,10 +671,9 @@ def _ingest_compendia_jsonl_url(url: str,
                                 insrt_missing_taxa: bool = False,
                                 glbl_chnk_cnt_start: int = 0) -> int:
     chunk_ctr = 0
-    chunks_per_analyze = math.ceil(ROWS_PER_ANALYZE / chunk_size)
-    chunks_per_vacuum = math.ceil(ROWS_PER_VACUUM / chunk_size)
-    if chunks_per_vacuum % chunks_per_analyze != 0:
-        raise ValueError("ROWS_PER_VACUUM / ROWS_PER_ANALYZE must be integer")
+    chunks_per_analyze_list: list[int] = [int(x) for x in
+                                          numpy.ceil(numpy.array(ROWS_PER_ANALYZE) / \
+                                                    chunk_size)]
     for chunk in pd.read_json(url,
                               lines=True,
                               chunksize=chunk_size):
@@ -727,12 +713,10 @@ def _ingest_compendia_jsonl_url(url: str,
                           f"; time to complete file: {time_to_complete_str}")
                 else:
                     print("\n")
-            if (chunk_ctr + glbl_chnk_cnt_start) % \
-               chunks_per_analyze == 0:
+            if any((chunk_ctr + glbl_chnk_cnt_start) % \
+                   chunks_per_analyze == 0 \
+                   for chunks_per_analyze in chunks_per_analyze_list):
                 _do_index_analyze(conn, log_work)
-                if (chunk_ctr + glbl_chnk_cnt_start) % \
-                   chunks_per_vacuum == 0:
-                    _do_index_vacuum(conn, log_work)
         except Exception as e:
             conn.rollback()
             raise e
@@ -815,17 +799,26 @@ def _set_pragmas_for_ingestion(conn: sqlite3.Connection,
                                wal_size: int):
     conn.execute("PRAGMA synchronous = OFF;")
     conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA optimize;")
     conn.execute(f"PRAGMA wal_autocheckpoint = {wal_size};")
 
 def _set_pragmas_for_querying(conn: sqlite3.Connection):
+    # wal_checkpoint(FULL) is the correct choice for
+    # a read-only database in query mode:
     conn.execute("PRAGMA wal_checkpoint(FULL);")
+    # journal_mode=DELETE is the correct choice for
+    # a read-only database in query mode:
     conn.execute("PRAGMA journal_mode = DELETE;")
     # This last one is unnecessary if DB is read-only:
     conn.execute("PRAGMA synchronous = FULL;")
 
 def _cleanup_indices(conn: sqlite3.Connection):
     conn.execute("ANALYZE")
+    conn.execute("PRAGMA locking_mode=EXCLUSIVE")
     conn.execute("VACUUM")
+    result = conn.execute("PRAGMA integrity_check").fetchall()
+    if result != [("ok",)]:
+        raise RuntimeError(f"Database integrity check failed: {result}")
 
 def _do_final_cleanup(conn: sqlite3.Connection,
                       log_work: bool,
