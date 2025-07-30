@@ -59,7 +59,7 @@ DEFAULT_BABEL_CONFLATION_URL = urllib.parse.urljoin(DEFAULT_BABEL_RELEASE_URL,
 DEFAULT_DATABASE_FILE_NAME = 'babel.sqlite'
 
 DEFAULT_TEST_TYPE = None
-DEFAULT_TEST_FILE = "test-tiny.jsonl"
+DEFAULT_COMPENDIA_TEST_FILE = "test-tiny.jsonl"
 DEFAULT_LINES_PER_CHUNK = 100_000
 WAL_SIZE = 1000
 
@@ -103,10 +103,10 @@ def _get_args() -> argparse.Namespace:
                             default=DEFAULT_TEST_TYPE,
                             help='if running a test, specify the test type '
                             '(1 or 2)')
-    arg_parser.add_argument('--test-file',
+    arg_parser.add_argument('--test-compendia-file',
                             type=str,
-                            dest='test_file',
-                            default=DEFAULT_TEST_FILE,
+                            dest='test_compendia_file',
+                            default=DEFAULT_COMPENDIA_TEST_FILE,
                             help='the JSON-lines file to be used for testing '
                             '(test type 1 only)')
     arg_parser.add_argument('--quiet',
@@ -664,6 +664,15 @@ TAXON_FILE = 'OrganismTaxon.txt'
 
 FILE_NAME_SUFFIX_START_NUMBERED = COMPENDIA_FILE_SUFFIX + '.00'
 
+def _create_file_map(file_name: str) -> dict[str, htmllistparse.FileEntry]:
+    file_size = os.path.getsize(file_name)
+    file_modif = os.path.getmtime(file_name)
+    file_entry = htmllistparse.FileEntry(
+        file_name,
+        file_modif,
+        file_size,
+        "file")
+    return {file_name: file_entry}
 
 def _prune_compendia_files(file_list: list[htmllistparse.FileEntry]) ->\
     tuple[tuple[str, ...],
@@ -819,7 +828,8 @@ def _make_ingest_urls(dry_run: bool) -> Callable:
                     get_make_chunk_processor_args: Callable,
                     ingest_url: Callable,
                     glbl_chnk_cnt_start: int) -> int:
-        print(f"ingesting {file_type} files at: {base_url}")
+        ingest_location = base_url if base_url != "" else "(local)"
+        print(f"ingesting {file_type} files at: {ingest_location}")
         for file_name in file_names:
             file_size = file_map[file_name].size
             _log_elapsed(start_time_sec, file_type, file_name, file_size)
@@ -841,7 +851,7 @@ def main(babel_compendia_url: str,
          lines_per_chunk: int,
          use_existing_db: bool,
          test_type: Optional[int],
-         test_file: Optional[str],
+         test_compendia_file: Optional[str],
          quiet: bool,
          dry_run: bool,
          print_ddl: bool,
@@ -908,17 +918,15 @@ def main(babel_compendia_url: str,
                                      insrt_missing_taxa)
 
         if test_type == 1:
-            if test_file is None:
-                raise ValueError("test_file cannot be None")
-            print(f"ingesting file: {test_file}")
-            process_compendia_chunk = \
-                make_compendia_chunk_processor(insrt_missing_taxa=True)
-            glbl_chnk_cnt = \
-                ingest_compendia_url(test_file,
-                                     process_compendia_chunk,
-                                     total_size=None,
-                                     glbl_chnk_cnt_start=glbl_chnk_cnt)
-
+            ingest_urls((test_compendia_file,),
+                        _create_file_map(test_compendia_file),
+                        "",
+                        "compendia",
+                        start_time_sec,
+                        make_compendia_chunk_processor,
+                        make_get_make_chunkproc_args_compendia(insrt_missing_taxa=True),
+                        ingest_compendia_url,
+                        glbl_chnk_cnt)
         elif test_type == 2:
             ingest_urls(TEST_2_COMPENDIA,
                         compendia_map_names,
@@ -929,7 +937,6 @@ def main(babel_compendia_url: str,
                         make_get_make_chunkproc_args_compendia(insrt_missing_taxa=True),
                         ingest_compendia_url,
                         glbl_chnk_cnt)
-
         elif test_type == 3:
             ingest_urls(TEST_3_COMPENDIA,
                         compendia_map_names,
