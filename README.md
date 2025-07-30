@@ -62,7 +62,7 @@ These checks should be run before any commit:
 ./run-checks.sh
 ```
 which will run type checks (using `mypy`), lint checks (using `ruff`),
-and unit tests (using `pytest`).
+dead code tests (using `vulture`), and unit tests (using `pytest`).
 
 # Schema
 This schema diagram was generated using DbVisualizer Free version 24.3.3.
