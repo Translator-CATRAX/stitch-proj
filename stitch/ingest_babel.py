@@ -396,9 +396,9 @@ def _curies_to_pkids(conn: sqlite3.Connection,
 
 
 def _make_conflation_chunk_processor(conn: sqlite3.Connection,
-                                     conflation_type: int) -> Callable:
-    if conflation_type not in ALLOWED_CONFLATION_TYPES:
-        raise ValueError(f"invalid conflation_type value: {conflation_type};"
+                                     conflation_type_id: int) -> Callable:
+    if conflation_type_id not in ALLOWED_CONFLATION_TYPES:
+        raise ValueError(f"invalid conflation_type value: {conflation_type_id};"
                          "it must be in the set: {ALLOWED_CONFLATION_TYPES}")
     def process_conflation_chunk(chunk: Iterable[str]):
         cursor = conn.cursor()
@@ -410,7 +410,7 @@ def _make_conflation_chunk_processor(conn: sqlite3.Connection,
             cluster_id = _insert_and_return_id(cursor,
                                                "INSERT INTO conflation_clusters (type) "
                                                "VALUES (?) RETURNING id;",
-                                               (conflation_type,))
+                                               (conflation_type_id,))
             placeholders = ','.join(['?'] * len(curie_list))
             query = f"SELECT id from identifiers WHERE curie IN ({placeholders});"
             assert len(curie_list)==query.count('?'), "placeholder count mismatch"
