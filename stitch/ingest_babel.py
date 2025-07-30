@@ -786,7 +786,9 @@ def _customize_temp_dir(temp_dir: str,
         new_args = [python_exe, "-u", sys.argv[0], *sys.argv[1:], "--no-exec"]
         os.execve(python_exe, new_args, os.environ.copy())
     os.environ["RAY_TMPDIR"] = temp_dir
-    tempfile.tempdir = temp_dir  # noqa: VULTURE
+    # the "noqa" is to quiet a Vulture warning
+    # while at the same time not upsetting "ruff":
+    tempfile.tempdir = temp_dir  # noqa
     if not quiet:
         print(f"Setting temp dir to: {temp_dir}")
 
@@ -861,6 +863,9 @@ def main(babel_compendia_url: str,
     if temp_dir is not None:
         _customize_temp_dir(temp_dir, no_exec, quiet)
 
+    if test_type is not None and test_type == 1 and test_compendia_file is None:
+        raise ValueError("for test type 1, you must specify --test_compendia_file")
+
     _initialize_ray()
 
     print_ddl_file_obj = sys.stderr if print_ddl else None
@@ -894,13 +899,13 @@ def main(babel_compendia_url: str,
                             log_work,
                             print_ddl_file_obj=print_ddl_file_obj)
 
-        ingest_compendia_url = _make_url_ingester(conn,
-                                                  lines_per_chunk,
-                                                  _read_compendia_chunks,
-                                                  log_work)
-        ingest_conflation_url = _make_url_ingester(conn,
-                                                   lines_per_chunk,
-                                                   _read_conflation_chunks)
+        do_ingest_compendia_url = _make_url_ingester(conn,
+                                                     lines_per_chunk,
+                                                     _read_compendia_chunks,
+                                                     log_work)
+        do_ingest_conflation_url = _make_url_ingester(conn,
+                                                      lines_per_chunk,
+                                                      _read_conflation_chunks)
 
         make_conflation_chunk_processor = \
             functools.partial(_make_conflation_chunk_processor, conn)
@@ -917,66 +922,61 @@ def main(babel_compendia_url: str,
             return functools.partial(_get_make_chunkproc_args_compendia,
                                      insrt_missing_taxa)
 
+        ingest_args_compendia = \
+            {
+                "file_names": compendia_sorted_files,
+                "file_map": compendia_map_names,
+                "base_url": babel_compendia_url,
+                "file_type": "compendia",
+                "start_time_sec": start_time_sec,
+                "make_chunk_processor": make_compendia_chunk_processor,
+                "get_make_chunk_processor_args":
+                make_get_make_chunkproc_args_compendia(insrt_missing_taxa=True),
+                "ingest_url": do_ingest_compendia_url,
+                "glbl_chnk_cnt_start": glbl_chnk_cnt
+            }
+
+        ingest_args_conflation = \
+            {
+                "file_names": conflation_sorted_files,
+                "file_map": conflation_map_names,
+                "base_url": babel_conflation_url,
+                "file_type": "conflation",
+                "start_time_sec": start_time_sec,
+                "make_chunk_processor": make_conflation_chunk_processor,
+                "get_make_chunk_processor_args":
+                get_make_chunkproc_args_conflation,
+                "ingest_url": do_ingest_conflation_url,
+                "glbl_chnk_cnt_start": glbl_chnk_cnt
+            }
+
         if test_type == 1:
-            ingest_urls((test_compendia_file,),
-                        _create_file_map(test_compendia_file),
-                        "",
-                        "compendia",
-                        start_time_sec,
-                        make_compendia_chunk_processor,
-                        make_get_make_chunkproc_args_compendia(insrt_missing_taxa=True),
-                        ingest_compendia_url,
-                        glbl_chnk_cnt)
+            assert test_compendia_file is not None
+            ingest_args_compendia.update({
+                "file_names": (test_compendia_file,),
+                "base_url": "",
+                "file_map": _create_file_map(test_compendia_file)
+            })
+            ingest_urls(**ingest_args_compendia)
         elif test_type == 2:
-            ingest_urls(TEST_2_COMPENDIA,
-                        compendia_map_names,
-                        babel_compendia_url,
-                        "compendia",
-                        start_time_sec,
-                        make_compendia_chunk_processor,
-                        make_get_make_chunkproc_args_compendia(insrt_missing_taxa=True),
-                        ingest_compendia_url,
-                        glbl_chnk_cnt)
+            ingest_args_compendia.update({
+                "file_names": TEST_2_COMPENDIA
+            })
+            ingest_urls(**ingest_args_compendia)
         elif test_type == 3:
-            ingest_urls(TEST_3_COMPENDIA,
-                        compendia_map_names,
-                        babel_compendia_url,
-                        "compendia",
-                        start_time_sec,
-                        make_compendia_chunk_processor,
-                        make_get_make_chunkproc_args_compendia(insrt_missing_taxa=False),
-                        ingest_compendia_url,
-                        glbl_chnk_cnt)
-            ingest_urls(TEST_3_CONFLATION,
-                        conflation_map_names,
-                        babel_conflation_url,
-                        "conflation",
-                        start_time_sec,
-                        make_conflation_chunk_processor,
-                        get_make_chunkproc_args_conflation,
-                        ingest_conflation_url,
-                        glbl_chnk_cnt)
-
+            ingest_args_compendia.update({
+                "file_names": TEST_3_COMPENDIA,
+                "get_make_chunk_processor_args":
+                make_get_make_chunkproc_args_compendia(insrt_missing_taxa=False)
+            })
+            ingest_urls(**ingest_args_compendia)
+            ingest_args_conflation.update({
+                "file_names": TEST_3_CONFLATION
+            })
+            ingest_urls(**ingest_args_conflation)
         elif test_type is None:
-            ingest_urls(compendia_sorted_files,
-                        compendia_map_names,
-                        babel_compendia_url,
-                        "compendia",
-                        start_time_sec,
-                        make_compendia_chunk_processor,
-                        make_get_make_chunkproc_args_compendia(insrt_missing_taxa=True),
-                        ingest_compendia_url,
-                        glbl_chnk_cnt)
-            ingest_urls(conflation_sorted_files,
-                        conflation_map_names,
-                        babel_conflation_url,
-                        "conflation",
-                        start_time_sec,
-                        make_conflation_chunk_processor,
-                        get_make_chunkproc_args_conflation,
-                        ingest_conflation_url,
-                        glbl_chnk_cnt)
-
+            ingest_urls(**ingest_args_compendia)
+            ingest_urls(**ingest_args_conflation)
         else:
             assert False, f"invalid test_type: {test_type}; " \
                           "must be one of 1, 2, 3, or None"
