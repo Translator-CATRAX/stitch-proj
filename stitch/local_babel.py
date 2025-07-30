@@ -17,15 +17,15 @@ T = TypeVar("T")
 R = TypeVar("R")
 
 class IdentifierInfo(TypedDict):
-    description: str
-    identifier: str
-    label: str
+    description: str  # noqa: VULTURE
+    identifier: str  # noqa: VULTURE
+    label: str  # noqa: VULTURE
 
 
 class CliqueInfo(TypedDict):
-    ic: float
-    id: IdentifierInfo
-    type: list[str]
+    ic: float  # noqa: VULTURE
+    id: IdentifierInfo  # noqa: VULTURE
+    type: list[str]  # noqa: VULTURE
 
 
 
