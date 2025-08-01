@@ -17,11 +17,7 @@ from stitch.local_babel import (
 
 @pytest.fixture(scope="session")
 def db_filename() -> str:
-    return "db/babel-20250123.sqlite"
-
-@pytest.fixture(scope="session")
-def db_filename_test3() -> str:
-    return "db/babel-test3.sqlite"
+    return "db/babel-20250331.sqlite"
 
 @pytest.fixture(scope="function")
 def pool():
@@ -34,8 +30,8 @@ def readonly_conn(db_filename):
         yield conn
 
 @pytest.fixture(scope="function")
-def conn_test3(db_filename_test3):
-    with connect_to_db_read_only(db_filename_test3) as conn:
+def conn_test3(db_filename):
+    with connect_to_db_read_only(db_filename) as conn:
         yield conn
 
 def test_get_n_random_curies(db_filename: str):
@@ -98,9 +94,9 @@ def test_map_curie_to_conflation_curies(conn_test3: sqlite3.Connection):
     curies = map_curie_to_conflation_curies(conn_test3, "XYZZY:533234", 1)
     assert not curies
 
-def test_map_curies_to_conflation_curies(db_filename_test3: str):
+def test_map_curies_to_conflation_curies(db_filename: str):
     with multiprocessing.Pool(processes=4) as pool:
-        curies = map_curies_to_conflation_curies(db_filename_test3,
+        curies = map_curies_to_conflation_curies(db_filename,
                                                  ("RXCUI:1014098",
                                                   "XYZZY:533234",
                                                   "RXCUI:1014098"),
