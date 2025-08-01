@@ -10,7 +10,8 @@ Some tools for building a Translator BigKG. This software project is experimenta
 - CPython 3.12, which needs to be available in your path as `python3.12`
 - Ubuntu or MacOS
 - At least 32 GiB of system memory
-- At least 600 GiB of free file system storage space (usage transiently spikes to ~522 GiB and then the final database size is ~172 GiB).
+- To build `babel.sqlite`, at least 600 GiB of free file system storage space (usage transiently spikes to ~522 GiB and then the final database size is ~172 GiB).
+- To host `babel.sqlite`, 200 GiB of free system storage space.
 
 # Systems tested
 
