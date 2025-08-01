@@ -1,17 +1,18 @@
 # stitch
 Some tools for building a Translator BigKG. This software project is experimental and unfinished.
 
-# Introduction There are two types of intended users for this software suite,
-someone who is tasked with ingesting Babel into a local sqlite databse (an
-"ingester") and someone developing a application, such as a BigKG build system,
-that wants to programmatically query a local Babel sqlite database for node
-normalization, etc. ("querier"). The "ingester" type user will need to rea this
-entire README document, in order to be able to set up and run the
-`ingest_babel.py` program to carry out an ingest of Babel into a local sqlite
-database. The "querier" type user can skip over the sections of this document
-that discuss ingesting Babel, and focus on the sections about downloading the
-pre-built Babel sqlite database from S3 and using the `local_babel.py` python
-module that provides functions for querying the local Babel sqlite database.
+# Introduction 
+There are two types of intended users for this software suite, someone who is
+tasked with ingesting Babel into a local sqlite databse (an "ingester") and
+someone developing a application, such as a BigKG build system, that wants to
+programmatically query a local Babel sqlite database for node normalization,
+etc. ("querier"). The "ingester" type user will need to rea this entire README
+document, in order to be able to set up and run the `ingest_babel.py` program to
+carry out an ingest of Babel into a local sqlite database. The "querier" type
+user can skip over the sections of this document that discuss ingesting Babel,
+and focus on the sections about downloading the pre-built Babel sqlite database
+from S3 and using the `local_babel.py` python module that provides functions for
+querying the local Babel sqlite database.
 
 # Tools
 - `ingest_babel.py`: downloads and ingests the Babel concept identifier synonymization database into a local sqlite3 relational database
@@ -43,6 +44,17 @@ the Graviton3 processor. I've tested on the following MacOS system:
 - Apple SSD AP2048R Media SSD (2 TiB)
 - `python3.12` installed via Homebrew
 - `openblas` installed via Homebrew
+
+# Python distribution package requirements 
+All external PyPI distribution package requirements for Stitch are listed in the
+`requirements.txt` file.  Stitch's `run-checks.sh` script (see section "Running
+the type checks, lint checks, ..." below) depends on the packages `pytest`,
+`ruff`, and `vulture`.  For a "querying" type user that is just using
+`local_babel.py`, only three PyPI distribution packages are needed, `requests`,
+`numpy`, and the Biolink Model Toolkit (`bmt`). Additionally, for an "ingester"
+type user who wants to run `ingest_babel.py` to build a local Babel sqlite
+database from scratch, the PyPI packages `pandas`, `ray`, `swifter`, and
+`htmllistparse` are needed.
 
 # Setup of a python virtualenv for using the `stich` software
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
