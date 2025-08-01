@@ -12,12 +12,10 @@ CONFLATION_TYPE_NAMES_IDS = \
     {'DrugChemical': 1,
      'GeneProtein': 2}
 
-def get_biolink_categories(log_work: bool = False) -> set[str]:
+def get_biolink_categories() -> tuple[set[str], str]:
     tk = bmt.Toolkit()
-    if log_work:
-        ver = tk.get_model_version()
-        print(f"loading Biolink model version: {ver}")
-    return set(tk.get_all_classes(formatted=True))
+    ver = tk.get_model_version()
+    return (set(tk.get_all_classes(formatted=True)), ver)
 
 
 def namespace_to_dict(namespace: argparse.Namespace) -> dict[str, Any]:
