@@ -13,7 +13,7 @@ Some tools for building a Translator BigKG. This software project is experimenta
 - To build `babel.sqlite`, at least 600 GiB of free file system storage space (usage transiently spikes to ~522 GiB and then the final database size is ~172 GiB).
 - To host `babel.sqlite`, 200 GiB of free system storage space.
 
-# Systems tested
+# Systems on which this software has been tested
 
 ## AWS 
 - Ubuntu 24.04
@@ -32,7 +32,7 @@ the Graviton3 processor. I've tested on the following MacOS system:
 - `python3.12` installed via Homebrew
 - `openblas` installed via Homebrew
 
-# Setup
+# Setup of the `stich` software
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
 - `git clone https://github.com/Translator-CATRAX/stitch.git`
 - `cd stitch`
@@ -40,7 +40,7 @@ the Graviton3 processor. I've tested on the following MacOS system:
 - `source venv/bin/activate`
 - `pip3 install -r requirements.txt`
 
-# How to run the Babel ingest in AWS
+# How to run the `stich` Babel ingest in AWS
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
 - `cd stitch`
 - `screen`
