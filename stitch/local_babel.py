@@ -236,3 +236,21 @@ def get_n_random_curies(db_filename: str,
     return tuple(chainer(mapper(processor, batches)))
 
 
+def get_table_row_counts(conn: sqlite3.Connection) -> dict[str, int]:
+    """Returns a dictionary mapping each table name to its row count."""
+    cursor = conn.cursor()
+
+    # Get the list of user-defined tables (excluding internal SQLite tables)
+    cursor.execute("""
+        SELECT name FROM sqlite_master
+        WHERE type = 'table' AND name NOT LIKE 'sqlite_%';
+    """)
+    tables = [row[0] for row in cursor.fetchall()]
+
+    row_counts: dict[str, int] = {}
+    for table in tables:
+        cursor.execute(f"SELECT COUNT(*) FROM {table};")
+        count = cursor.fetchone()[0]
+        row_counts[table] = count
+
+    return row_counts
