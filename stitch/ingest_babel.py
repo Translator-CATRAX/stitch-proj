@@ -947,7 +947,8 @@ def main(babel_compendia_url: str,
                                                      log_work)
         do_ingest_conflation_url = _make_url_ingester(conn,
                                                       lines_per_chunk,
-                                                      _read_conflation_chunks)
+                                                      _read_conflation_chunks,
+                                                      log_work)
 
         make_conflation_chunk_processor = \
             functools.partial(_make_conflation_chunk_processor, conn)
