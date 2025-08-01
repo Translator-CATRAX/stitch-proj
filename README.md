@@ -52,7 +52,7 @@ the Graviton3 processor. I've tested on the following MacOS system:
 - `source venv/bin/activate`
 - `pip3 install -r requirements.txt`
 
-# How to run the `stich` Babel ingest in AWS
+# How to run the `stich` Babel sqlite ingest in AWS
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
 - `cd stitch`
 - `screen`
