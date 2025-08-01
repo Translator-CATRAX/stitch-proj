@@ -1,12 +1,12 @@
 import argparse
 import itertools
+import tempfile
 import urllib
 from typing import Any, Iterable, Iterator, TypeVar, Union, cast
 
 import bmt
 import numpy as np
 import requests
-import tempfile
 
 CONFLATION_TYPE_NAMES_IDS = \
     {'DrugChemical': 1,
