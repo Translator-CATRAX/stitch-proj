@@ -1,6 +1,18 @@
 # stitch
 Some tools for building a Translator BigKG. This software project is experimental and unfinished.
 
+# Introduction There are two types of intended users for this software suite,
+someone who is tasked with ingesting Babel into a local sqlite databse (an
+"ingester") and someone developing a application, such as a BigKG build system,
+that wants to programmatically query a local Babel sqlite database for node
+normalization, etc. ("querier"). The "ingester" type user will need to rea this
+entire README document, in order to be able to set up and run the
+`ingest_babel.py` program to carry out an ingest of Babel into a local sqlite
+database. The "querier" type user can skip over the sections of this document
+that discuss ingesting Babel, and focus on the sections about downloading the
+pre-built Babel sqlite database from S3 and using the `local_babel.py` python
+module that provides functions for querying the local Babel sqlite database.
+
 # Tools
 - `ingest_babel.py`: downloads and ingests the Babel concept identifier synonymization database into a local sqlite3 relational database
 - `local_babel.py`: functions for querying the local Babel sqlite database
@@ -32,7 +44,7 @@ the Graviton3 processor. I've tested on the following MacOS system:
 - `python3.12` installed via Homebrew
 - `openblas` installed via Homebrew
 
-# Setup of the `stich` software
+# Setup of a python virtualenv for using the `stich` software
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
 - `git clone https://github.com/Translator-CATRAX/stitch.git`
 - `cd stitch`
@@ -59,7 +71,16 @@ Note, the `ingest_babel.py` script does not ingest the Babel `conflation` files
 in the big KG, rather than to conflate gene/protein concept nodes and conflate
 chemical/drug concept nodes.
 
-# Schema
+# Downloading a pre-built Babel sqlite database file
+[`babel-20250331.sqlite`](https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250331.sqlite)
+(173 GiB) is available for download from AWS S3.  For details and an MD5
+checksum hash, see the (Releases
+page)[https://github.com/Translator-CATRAX/stitch/releases] for the stich
+project. You will need to download (or, alternatively, build from scratch using
+`ingest_babel.py`) this file in order to be able to run the unit test 
+suite for the "stitch" software.
+
+# The local Babel sqlite database schema
 This schema diagram was generated using DbVisualizer Free version 24.3.3.
 ![stitch Babel sqlite3 database schema with conflation](schema.png)
 
@@ -79,8 +100,6 @@ have not yet done so.  See issue 16:
 https://github.com/Translator-CATRAX/stitch/issues/16
 
 # Analyzing the local Babel sqlite database
-
-
 Consider installing and compiling `sqlite3_analyzer`, which is available
 from the [sqlite software project area on GitHub](https://github.com/sqlite/sqlite).
 On Ubuntu, you can just perform the following steps to have
@@ -105,7 +124,7 @@ sqlite3_analyzer babel.sqlite > babel-sqlite-analysis.txt
 ```
 The analysis should take less than an hour.
 
-# How to use
+# How to use the local Babel sqlite database
 
 1. When you create a connection, make sure to set `PRAGMA foreign_keys = ON;`
 
@@ -120,6 +139,11 @@ which will run type checks (using `mypy`), lint checks (using `ruff`),
 dead code tests (using `vulture`), and unit tests (using `pytest`).
 
 # How to run just the unit test suite
+First, you need to make sure that underneath the top-level
+"stich" directory, there is a subdirectory "db" containing 
+the `babel-20250331.sqlite` file (see section 
+"Downloading a pre-built Babel sqlite database file").
+Then you can run the unit test suite, like this:
 ```
 cd stitch
 source venv/bin/activate
