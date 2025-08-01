@@ -49,9 +49,9 @@ the Graviton3 processor. I've tested on the following MacOS system:
 - `tail -f ingest-babel.log` (so you can watch progress)
 - In another terminal session, watch memory usage using `top`
 
-After approximately 50 hours, the ingest script should save the database as a file
-`/home/ubuntu/stitch/babel.sqlite`; as of the January 23, 2025 release of Babel, the
-`babel.sqlite` file produced by the `ingest_babel.py` script is 164 GiB.
+After approximately 64 hours, the ingest script should save the database as a file
+`/home/ubuntu/stitch/babel.sqlite`; as of the March 31, 2025 release of Babel, the
+`babel.sqlite` file produced by the `ingest_babel.py` script is 172 GiB.
 
 Note, the `ingest_babel.py` script does not ingest the Babel `conflation` files
 `DrugChemical.txt` and `GeneProtein.txt`; the plan is to ingest these as "edges"
