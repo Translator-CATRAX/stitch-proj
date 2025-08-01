@@ -16,7 +16,7 @@ def _get_args() -> argparse.Namespace:
     arg_parser.add_argument('filename',
                             type=str,
                             default='babel.sqlite',
-                            help='the lcoal Babel sqlite database, like babel.sqlite')
+                            help='the local Babel sqlite database, like babel.sqlite')
     return arg_parser.parse_args()
 
 def main(filename: str):
