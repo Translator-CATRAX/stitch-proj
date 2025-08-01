@@ -140,3 +140,11 @@ source venv/bin/activate python3 stitch/ingest_babel.sql --print-ddl --dry-run
 pane, click on the "References" tab. Use macOS system screen-capture tool to
 obtain a PNG of the schema diagram.
 
+# To print out the table row counts:
+
+Run these steps:
+```
+cd stitch
+source venv/bin/activate
+python3.12 stitch/row_counts.py babel.sqlite
+```
