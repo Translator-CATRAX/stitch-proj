@@ -20,22 +20,22 @@ module that provides functions for querying the local Babel sqlite database.
 
 # Requirements
 - CPython 3.12, which needs to be available in your path as `python3.12`
-- Ubuntu or MacOS
 - At least 32 GiB of system memory
 - To build `babel.sqlite`, at least 600 GiB of free file system storage space (usage transiently spikes to ~522 GiB and then the final database size is ~172 GiB).
 - To use a local `babel.sqlite` in your application, 200 GiB of free system storage space to store the sqlite file.
+- Linux or MacOS (this software was not tested on Windows); see "Systems on which this software has been tested"
 
 # Systems on which this software has been tested
-
-## AWS 
+Stitch has only been tested in two compute environments:
+## Ubuntu/Graviton
 - Ubuntu 24.04
-- `c7g.4xlarge` instance (Graviton3 processor), 32 GiB of memory
+- `c7g.4xlarge` instance (Graviton3 processor, which is ARM64 architecture), 32 GiB of memory
 - `gp3` root volume (800 GiB)
 - The following packages need to be `apt` installed: `sqlite3`, `build-essential`, `gcc`, `g++`, `make`, `libffi-dev`, `libssl-dev`, `zlib1g-dev`, `libbz2-dev`, `libreadline-dev`, `libsqlite3-dev`, `libncursesw5-dev`, `tk-dev`, `libgdbm-dev`, `libnss3-dev`, `liblzma-dev`, `uuid-dev`, `python3-dev`, `gfortran`, `libopenblas-dev`, `liblapack-dev`, `libfreetype6-dev`, `libpng-dev`, `libjpeg-dev`, `libtiff-dev`, `libffi-dev`, `liblzma-dev`, `pkg-config`, `cmake`, `python3.12-venv`
 - CPython, Numpy, and Pandas need to be compiled locally using gcc/g++ with the following CFLAGS:
 ```-mcpu=neoverse-v1 -mtune=neoverse-v1 -march=armv8.4-a+crypto -O3 -pipe```
 
-## MacOS
+## MacOS/Apple Silicon
 For reasons I don't fully understand, `ingest_babel.py` runs quite fast on the M1 Max, compared to
 the Graviton3 processor. I've tested on the following MacOS system:
 - MacOS 14.6.1
