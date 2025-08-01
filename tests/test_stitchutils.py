@@ -10,8 +10,11 @@ def test_nan_to_none():
     assert su.nan_to_none(np.float64(1.0)) is not None
 
 def test_get_biolink_categories():
-    c = su.get_biolink_categories()
+    c, v = su.get_biolink_categories()
     assert 'biolink:Protein' in c
+    assert len(c) > 100
+    assert '.' in v
+    assert len(v.split('.')) == 3
 
 def test_namespace_to_dict():
     ns = argparse.Namespace(foo=1, bar='abc')
