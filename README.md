@@ -7,7 +7,7 @@ Some tools for building a Translator BigKG. This software project is experimenta
 - `row_counts.py`: a script that prints out the row counts of the tables in the local Babel sqlite database
 
 # Requirements
-- CPython 3.12, available in your path as `python3.12`
+- CPython 3.12, which needs to be available in your path as `python3.12`
 - Ubuntu or MacOS
 - At least 32 GiB of system memory
 - At least 600 GiB of free file system storage space
