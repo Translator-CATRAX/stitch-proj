@@ -1,16 +1,19 @@
 # stitch
-Some tools for building a Translator BigKG (experimental! not yet finished!) 
+Some tools for building a Translator BigKG. This software project is experimental and unfinished.
 
 # Tools
 - `ingest_babel.py`: downloads and ingests the Babel concept identifier synonymization database into a local sqlite3 relational database
+- `local_babel.py`: functions for querying the local Babel sqlite database
+- `row_counts.py`: a script that prints out the row counts of the tables in the local Babel sqlite database
 
 # Requirements
-- CPython 3.12, available in your path as `python3.12`
+- CPython 3.12, which needs to be available in your path as `python3.12`
 - Ubuntu or MacOS
 - At least 32 GiB of system memory
-- At least 600 GiB of free file system storage space
+- To build `babel.sqlite`, at least 600 GiB of free file system storage space (usage transiently spikes to ~522 GiB and then the final database size is ~172 GiB).
+- To use a local `babel.sqlite` in your application, 200 GiB of free system storage space to store the sqlite file.
 
-# Systems tested
+# Systems on which this software has been tested
 
 ## AWS 
 - Ubuntu 24.04
@@ -29,7 +32,7 @@ the Graviton3 processor. I've tested on the following MacOS system:
 - `python3.12` installed via Homebrew
 - `openblas` installed via Homebrew
 
-# Setup
+# Setup of the `stich` software
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
 - `git clone https://github.com/Translator-CATRAX/stitch.git`
 - `cd stitch`
@@ -37,7 +40,7 @@ the Graviton3 processor. I've tested on the following MacOS system:
 - `source venv/bin/activate`
 - `pip3 install -r requirements.txt`
 
-# How to run the Babel ingest in AWS
+# How to run the `stich` Babel ingest in AWS
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
 - `cd stitch`
 - `screen`
@@ -47,9 +50,9 @@ the Graviton3 processor. I've tested on the following MacOS system:
 - `tail -f ingest-babel.log` (so you can watch progress)
 - In another terminal session, watch memory usage using `top`
 
-After approximately 50 hours, the ingest script should save the database as a file
-`/home/ubuntu/stitch/babel.sqlite`; as of the January 23, 2025 release of Babel, the
-`babel.sqlite` file produced by the `ingest_babel.py` script is 164 GiB.
+After approximately 64 hours, the ingest script should save the database as a file
+`/home/ubuntu/stitch/babel.sqlite`; as of the March 31, 2025 release of Babel, the
+`babel.sqlite` file produced by the `ingest_babel.py` script is 172 GiB.
 
 Note, the `ingest_babel.py` script does not ingest the Babel `conflation` files
 `DrugChemical.txt` and `GeneProtein.txt`; the plan is to ingest these as "edges"

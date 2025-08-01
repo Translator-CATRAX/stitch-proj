@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.12
 
 # Stephen A. Ramsey
 # Oregon State University
