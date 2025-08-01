@@ -47,14 +47,15 @@ the Graviton3 processor. I've tested on the following MacOS system:
 
 # Python distribution package requirements 
 All external PyPI distribution package requirements for Stitch are listed in the
-`requirements.txt` file.  Stitch's `run-checks.sh` script (see section "Running
+[`requirements.txt`](https://github.com/Translator-CATRAX/stitch/blob/main/requirements.txt) file.  Stitch's `run-checks.sh` script (see section "Running
 the type checks, lint checks, ..." below) depends on the packages `pytest`,
 `ruff`, and `vulture`.  For a "querying" type user that is just using
 `local_babel.py`, only three PyPI distribution packages are needed, `requests`,
 `numpy`, and the Biolink Model Toolkit (`bmt`). Additionally, for an "ingester"
 type user who wants to run `ingest_babel.py` to build a local Babel sqlite
 database from scratch, the PyPI packages `pandas`, `ray`, `swifter`, and
-`htmllistparse` are needed.
+`htmllistparse` are needed. The stitch `requirements.txt` file contains
+the full set of dependencies.
 
 # Setup of a python virtualenv for using the `stich` software
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
