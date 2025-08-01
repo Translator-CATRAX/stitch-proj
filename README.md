@@ -137,8 +137,7 @@ sqlite3_analyzer babel.sqlite > babel-sqlite-analysis.txt
 The analysis should take less than an hour.
 
 # How to use the local Babel sqlite database
-
-1. When you create a connection, make sure to set `PRAGMA foreign_keys = ON;`
+For now, see the module `tests/test_local_babel.py` for examples.
 
 # Running the type checks, lint checks, dead code checks, and unit tests:
 These checks should be run before any commit:
