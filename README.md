@@ -20,6 +20,19 @@ Some tools for building a Translator BigKG (experimental! not yet finished!)
 - CPython, Numpy, and Pandas need to be compiled locally using gcc/g++ with the following CFLAGS:
 ```-mcpu=neoverse-v1 -mtune=neoverse-v1 -march=armv8.4-a+crypto -O3 -pipe```
 
+Consider also installing and compiling `sqlite3_analyzer`, which is available
+from the [sqlite software project area on GitHub](https://github.com/sqlite/sqlite).
+On Ubuntu, you can just perform the following steps to have
+`sqlite3_analyzer` available in `/usr/local/bin`:
+```
+git clone https://github.com/sqlite/sqlite.git
+cd sqlite
+./configure --prefix=/usr/local
+make sqlite3_analyzer
+sudo cp sqlite3_analyzer /usr/local/bin
+sudo chmod a+x /usr/local/bin/sqlite3_analyzer
+```
+
 ## MacOS
 For reasons I don't fully understand, `ingest_babel.py` runs quite fast on the M1 Max, compared to
 the Graviton3 processor. I've tested on the following MacOS system:
@@ -56,14 +69,6 @@ Note, the `ingest_babel.py` script does not ingest the Babel `conflation` files
 in the big KG, rather than to conflate gene/protein concept nodes and conflate
 chemical/drug concept nodes.
 
-# Running the type checks, lint checks, and unit tests:
-These checks should be run before any commit:
-```
-./run-checks.sh
-```
-which will run type checks (using `mypy`), lint checks (using `ruff`),
-dead code tests (using `vulture`), and unit tests (using `pytest`).
-
 # Schema
 This schema diagram was generated using DbVisualizer Free version 24.3.3.
 ![stitch Babel sqlite3 database schema with conflation](schema.png)
@@ -87,11 +92,27 @@ https://github.com/Translator-CATRAX/stitch/issues/16
 
 1. When you create a connection, make sure to set `PRAGMA foreign_keys = ON;`
 
-# How to run the unit test suite
+# Running the type checks, lint checks, dead code checks, and unit tests:
+These checks should be run before any commit:
+```
+cd stitch
+source venv/bin/activate
+./run-checks.sh
+```
+which will run type checks (using `mypy`), lint checks (using `ruff`),
+dead code tests (using `vulture`), and unit tests (using `pytest`).
+
+# How to run just the unit test suite
 ```
 cd stitch
 source venv/bin/activate
 pytest -v
+```
+# How to run the integration tests of ingest_babel.py
+```
+cd stitch
+source venv/bin/activate
+./run-integration-tests.sh
 ```
 
 # How to regenerate the schema diagram
