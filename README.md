@@ -1,8 +1,9 @@
 # stitch
 Some tools for building a Translator BigKG. This software project is experimental and unfinished.
 
-# Introduction There are two types of intended users for this software suite,
-someone who is tasked with ingesting the
+# Introduction 
+There are two types of intended users for this software suite, someone who is
+tasked with ingesting the
 [Babel concept identifier normalization database](https://github.com/TranslatorSRI/Babel)
 into a local sqlite databse (an "ingester") and someone developing a
 application, such as a BigKG build system, that wants to programmatically query
