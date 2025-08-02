@@ -1,18 +1,19 @@
 # stitch
 Some tools for building a Translator BigKG. This software project is experimental and unfinished.
 
-# Introduction 
-There are two types of intended users for this software suite, someone who is
-tasked with ingesting Babel into a local sqlite databse (an "ingester") and
-someone developing a application, such as a BigKG build system, that wants to
-programmatically query a local Babel sqlite database for node normalization,
-etc. ("querier"). The "ingester" type user will need to rea this entire README
-document, in order to be able to set up and run the `ingest_babel.py` program to
-carry out an ingest of Babel into a local sqlite database. The "querier" type
-user can skip over the sections of this document that discuss ingesting Babel,
-and focus on the sections about downloading the pre-built Babel sqlite database
-from S3 and using the `local_babel.py` python module that provides functions for
-querying the local Babel sqlite database.
+# Introduction There are two types of intended users for this software suite,
+someone who is tasked with ingesting the
+[Babel concept identifier normalization database](https://github.com/TranslatorSRI/Babel)
+into a local sqlite databse (an "ingester") and someone developing a
+application, such as a BigKG build system, that wants to programmatically query
+a local Babel sqlite database for node normalization, etc. ("querier"). The
+"ingester" type user will need to rea this entire README document, in order to
+be able to set up and run the `ingest_babel.py` program to carry out an ingest
+of Babel into a local sqlite database. The "querier" type user can skip over the
+sections of this document that discuss ingesting Babel, and focus on the
+sections about downloading the pre-built Babel sqlite database from S3 and using
+the `local_babel.py` python module that provides functions for querying the
+local Babel sqlite database.
 
 # Tools
 - `ingest_babel.py`: downloads and ingests the Babel concept identifier synonymization database into a local sqlite3 relational database
@@ -187,3 +188,6 @@ cd stitch
 source venv/bin/activate
 python3.12 stitch/row_counts.py babel.sqlite
 ```
+
+# How to cite Babel in a publication
+Please see the [Babel `CITATION.cff` file](https://github.com/TranslatorSRI/Babel/blob/master/CITATION.cff).
