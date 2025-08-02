@@ -6,8 +6,10 @@ import pytest
 from stitch.local_babel import (
     connect_to_db_read_only,
     get_n_random_curies,
+    get_taxon_for_gene_or_protein,
     map_any_curie_to_cliques,
     map_curie_to_conflation_curies,
+    map_curie_to_preferred_curies,
     map_curies_to_conflation_curies,
     map_curies_to_preferred_curies,
     map_pref_curie_to_synonyms,
@@ -26,11 +28,6 @@ def pool():
 
 @pytest.fixture(scope="function")
 def readonly_conn(db_filename):
-    with connect_to_db_read_only(db_filename) as conn:
-        yield conn
-
-@pytest.fixture(scope="function")
-def conn_test3(db_filename):
     with connect_to_db_read_only(db_filename) as conn:
         yield conn
 
@@ -65,6 +62,7 @@ def test_map_preferred_curie_to_cliques(readonly_conn: sqlite3.Connection):
     curie = "CHEBI:15377"
     results = map_preferred_curie_to_cliques(readonly_conn, curie)
     assert isinstance(results, tuple)
+    pprint.pprint(results)
     for item in results:
         assert "id" in item
         assert "ic" in item
@@ -74,10 +72,12 @@ def test_map_curies_to_preferred_curies(db_filename: str):
     results = map_curies_to_preferred_curies(db_filename,
                                              ("MESH:D014867",
                                               "CHEBI:15377",
-                                              "HP:0001300"),
+                                              "HP:0001300",
+                                              "XYZZY:3432432"),
                                              None)
-    pprint.pprint(results)
-
+    assert results == (('CHEBI:15377', 'biolink:SmallMolecule', 'MESH:D014867'),
+                       ('CHEBI:15377', 'biolink:SmallMolecule', 'CHEBI:15377'),
+                       ('MONDO:0021095', 'biolink:Disease', 'HP:0001300'))
 
 def test_map_curies_to_preferred_curies_big(db_filename: str):
     with multiprocessing.Pool(processes=4) as pool:
@@ -88,10 +88,10 @@ def test_map_curies_to_preferred_curies_big(db_filename: str):
     unique_ids_mapped = tuple(set(row[2] for row in mapped))
     assert len(unique_ids_mapped) <= len(curies)
 
-def test_map_curie_to_conflation_curies(conn_test3: sqlite3.Connection):
-    curies = map_curie_to_conflation_curies(conn_test3, "RXCUI:1014098", 1)
+def test_map_curie_to_conflation_curies(readonly_conn: sqlite3.Connection):
+    curies = map_curie_to_conflation_curies(readonly_conn, "RXCUI:1014098", 1)
     assert len(curies) >= 14
-    curies = map_curie_to_conflation_curies(conn_test3, "XYZZY:533234", 1)
+    curies = map_curie_to_conflation_curies(readonly_conn, "XYZZY:533234", 1)
     assert not curies
 
 def test_map_curies_to_conflation_curies(db_filename: str):
@@ -102,4 +102,26 @@ def test_map_curies_to_conflation_curies(db_filename: str):
                                                   "RXCUI:1014098"),
                                                  pool)
     assert len(curies) >= 28
+
+
+def test_get_taxon_for_gene_or_protein(readonly_conn):
+    curie = get_taxon_for_gene_or_protein(readonly_conn,
+                                          ('NCBIGene:3569',))
+    assert curie == 'NCBITaxon:9606'
+    curie = get_taxon_for_gene_or_protein(readonly_conn,
+                                          ('XYZZY:234334',))
+    assert curie is None
+
+
+def test_map_curie_to_preferred_curies(readonly_conn: sqlite3.Connection):
+    res = map_curie_to_preferred_curies(readonly_conn, 'RXCUI:1014098')
+    assert res == (('RXCUI:1014098', 'biolink:Drug', 'RXCUI:1014098'),)
+    res = map_curie_to_preferred_curies(readonly_conn, 'XYZZY:23434334')
+    assert len(res)==0
+    res = map_curie_to_preferred_curies(readonly_conn, 'MESH:D014867')
+    assert res == (('CHEBI:15377', 'biolink:SmallMolecule', 'MESH:D014867'),)
+    pprint.pprint(res)
+    res = map_curie_to_preferred_curies(readonly_conn, 'UMLS:C0000657')
+    assert res == (('MESH:C115990', 'biolink:ChemicalEntity', 'UMLS:C0000657'),
+                   ('UMLS:C0000657', 'biolink:Protein', 'UMLS:C0000657'))
 
