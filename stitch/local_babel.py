@@ -139,6 +139,22 @@ WHERE identifiers.curie = ?;"""  # noqa W291
                     for row in cursor.execute(s, (curie,)).fetchall())
     return res
 
+def map_curie_to_preferred_curies(db_conn: sqlite3.Connection,
+                                  curie: str) -> \
+                                  tuple[CurieCurieAndType, ...]:
+    s = """
+SELECT prim_identif.curie, types.curie, identifiers.curie
+FROM identifiers as prim_identif
+INNER JOIN cliques ON prim_identif.id = cliques.primary_identifier_id
+INNER JOIN identifiers_cliques AS idcl ON cliques.id = idcl.clique_id
+INNER JOIN identifiers on idcl.identifier_id = identifiers.id
+INNER JOIN types on types.id = cliques.type_id
+WHERE identifiers.curie = ?;"""  # noqa W291
+    cursor = db_conn.cursor()
+    res = tuple((row[0], row[1], row[2])
+                for row in cursor.execute(s, (curie,)).fetchall())
+    return res
+
 def map_curies_to_preferred_curies(db_filename: str,
                                    curies: tuple[str, ...],
                                    pool: Optional[MultProcPool] = None) -> \
@@ -254,3 +270,13 @@ def get_table_row_counts(conn: sqlite3.Connection) -> dict[str, int]:
         row_counts[table] = count
 
     return row_counts
+
+def get_taxon_for_gene_or_protein(conn: sqlite3.Connection,
+                                  curie: str) -> Optional[str]:
+    row = conn.cursor().execute("""
+    SELECT id2.curie FROM identifiers AS id1
+    INNER JOIN identifiers_taxa ON identifiers_taxa.identifier_id = id1.id
+    INNER JOIN identifiers AS id2 ON identifiers_taxa.taxa_identifier_id = id2.id
+    WHERE id1.curie = ?;
+    """, curie).fetchone()
+    return row[0] if row else None
