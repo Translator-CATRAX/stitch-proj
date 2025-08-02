@@ -11,9 +11,8 @@ import local_babel as lb
 import stitchutils as su
 from typing import Any, Callable, Iterable, Optional
 
-babel_conn = None
 
-def _predicate_curie_to_space_case(curie: str) -> str:
+def _predicate_curie_to_space_case(curie: str) -> str: # noqa
     return curie[len('biolink:'):].replace('_', ' ')
 
 def _get_args() -> argparse.Namespace:
@@ -181,13 +180,15 @@ def _process_edges_row(row: pd.Series) -> \
 def _process_chunk_of_edges(edge_chunk: pd.DataFrame) -> \
         Iterable[tuple[Optional[dict[str, Any]], str, str]]:
     t = it.chain.from_iterable(tuple(_process_edges_row(row)) \
-                               for row_id, row in edge_chunk.iterrows())
+                               for _, row in edge_chunk.iterrows())
     return filter(lambda st: st[0] is not None, t)
 
 def main(nodes_file: str,
          edges_file: str,
          babel_db: str,
          edges_output_file: str):
+    print(f"nodes file is: {nodes_file}")
+    print(f"edges file is: {edges_file}")
     global _pick_category
     _pick_category = _make_pick_category()
     with lb.connect_to_db_read_only(babel_db) as conn:
