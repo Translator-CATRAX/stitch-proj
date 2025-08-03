@@ -190,5 +190,27 @@ source venv/bin/activate
 python3.12 stitch/row_counts.py babel.sqlite
 ```
 
+# Local Babel Instructions (Easy Setup for Erica Remote Development)
+1. Start in home directory
+```
+cd ~
+```
+
+2. Download stitch on a remote instance
+```
+git clone https://github.com/Translator-CATRAX/stitch.git
+```
+
+3. Setup stitch
+```
+bash -x stitch/setup-stitch.sh
+```
+When it stops, you need to put your AWS credentials in
+
+4. Normalize KG2pre
+```
+bash -x stitch-code/run-normalize-kg2pre.sh
+```
+
 # How to cite Babel in a publication
 Please see the [Babel `CITATION.cff` file](https://github.com/TranslatorSRI/Babel/blob/master/CITATION.cff).
