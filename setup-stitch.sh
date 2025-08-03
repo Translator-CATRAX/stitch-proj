@@ -69,6 +69,9 @@ else
 fi
 
 {
+${s3_cp_cmd} s3://${s3_bucket_public}/${kg2_nodes_filename} ${BUILD_DIR}/${kg2_nodes_filename}
+${s3_cp_cmd} s3://${s3_bucket_public}/${kg2_edges_filename} ${BUILD_DIR}/${kg2_edges_filename}
+
 date
 echo "================= setup-stitch.sh finished ================="
 } >> ${setup_log_file} 2>&1
