@@ -29,7 +29,7 @@ local Babel sqlite database.
 - Linux or MacOS (this software was not tested on Windows); see "Systems on which this software has been tested"
 
 # Systems on which this software has been tested
-Stitch has only been tested in two compute environments:
+The Stitch `ingest_babel.py` code has only been tested in two compute environments:
 ## Ubuntu/Graviton
 - Ubuntu 24.04
 - `c7g.4xlarge` instance (Graviton3 processor, which is ARM64 architecture), 32 GiB of memory
