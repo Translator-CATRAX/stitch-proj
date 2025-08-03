@@ -22,11 +22,11 @@ kg2_edges=${2:-"db/kg2-simplified-2.10.2-edges.jsonl.gz"}
 babel_sqlite=${3:-"db/babel-20250331.sqlite"}
 edges_output=${4:-"edges-output.jsonl"}
 
-${VENV_DIR}/bin/python3 -u ${CODE_DIR}/normalize_kg2pre.py \
-                           ${kg2_nodes} \
-                           ${kg2_edges} \
-                           ${babel_sqlite} \
-                           ${edges_output}
+${python_command} ${CODE_DIR}/normalize_kg2pre.py \
+                  ${kg2_nodes} \
+                  ${kg2_edges} \
+                  ${babel_sqlite} \
+                  ${edges_output}
 
 date
 echo "==============finished run-normalize-kg2pre.sh==============="

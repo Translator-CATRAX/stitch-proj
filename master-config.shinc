@@ -1,0 +1,4 @@
+BUILD_DIR=~/stitch-build
+VENV_DIR=~/stitch-venv
+CODE_DIR=~/stitch-code
+python_command="${VENV_DIR}/bin/python3 -u"
