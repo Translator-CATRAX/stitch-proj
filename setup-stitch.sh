@@ -28,7 +28,7 @@ date
 
 echo `hostname`
 
-## sym-link into RTX-KG2/
+## sym-link into stitch-code/
 if [ ! -L ${CODE_DIR} ]; then
     ln -sf ~/stitch ${CODE_DIR}
 fi
