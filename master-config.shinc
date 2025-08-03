@@ -7,5 +7,5 @@ s3_bucket=rtx-kg2
 s3_bucket_public=rtx-kg2-public
 s3_cp_cmd="aws s3 cp --no-progress --region ${s3_region}"
 kg2_version=2.10.2
-kg2_nodes_filename=kg2-simplified-${kg2_version}-nodes.jsonl.gz
-kg2_edges_filename=kg2-simplified-${kg2_version}-edges.jsonl.gz
+kg2pre_nodes_filename=kg2-simplified-${kg2_version}-nodes.jsonl.gz
+kg2pre_edges_filename=kg2-simplified-${kg2_version}-edges.jsonl.gz
