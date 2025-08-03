@@ -8,7 +8,5 @@ sudo apt-get install -y software-properties-common
 sudo -E add-apt-repository -y ppa:deadsnakes/ppa
 sudo apt-get install -y python3.12 python3.12-dev python3.12-venv
 
-sudo -H python3.12 /tmp/get-pip.py
-
 ## create a virtualenv for building KG2
 python3.12 -m venv ${VENV_DIR}
