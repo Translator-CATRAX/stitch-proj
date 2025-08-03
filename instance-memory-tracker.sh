@@ -5,7 +5,7 @@
 
 start_time=`date +"%Y-%m-%d-%H-%M-%S"`
 {
-echo "================= starting primative-instance-data-tracker.sh ================="
+echo "================= starting instance-memory-tracker.sh ================="
 
 while [[ true ]]; do
 	current_time=`date +"%Y-%m-%d-%H-%M-%S"`
@@ -19,5 +19,5 @@ done
 
 
 date
-echo "================= finished primative-instance-data-tracker.sh ================="
+echo "================= finished instance-memory-tracker.sh ================="
 } > instance-data-${start_time}.log
