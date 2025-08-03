@@ -24,6 +24,8 @@ edges_output=${4:-"${BUILD_DIR}/stitch-edges-output.jsonl"}
 
 ${s3_cp_cmd} s3://${s3_bucket_public}/${babel_sqlite} ${BUILD_DIR}/${babel_sqlite}
 
+date
+
 ${python_command} ${CODE_DIR}/normalize_kg2pre.py \
                   ${kg2_nodes} \
                   ${kg2_edges} \
