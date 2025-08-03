@@ -58,7 +58,7 @@ sudo DEBIAN_FRONTEND=noninateractive apt-get install -y \
 sudo DEBIAN_FRONTEND=noninateractive apt-get install -y awscli
 
 # we want python3.13 (also need python3.13-dev or else pip cannot install the python package "mysqlclient")
-source ${CODE_DIR}/setup-python313-with-pip3-in-ubuntu.shinc
+source ${CODE_DIR}/setup-python312-with-pip3-in-ubuntu.shinc
 ${VENV_DIR}/bin/pip3 install -r ${CODE_DIR}/requirements.txt
 } > ${setup_log_file} 2>&1
 
