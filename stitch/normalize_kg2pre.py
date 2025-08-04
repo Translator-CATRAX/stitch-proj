@@ -7,7 +7,7 @@ import math
 import operator
 import sqlite3
 from collections.abc import Callable, Iterable
-from typing import Any, Optional, TypeVar
+from typing import Any, NamedTuple, Optional, TypeVar
 
 import bmt
 import pandas as pd
@@ -135,9 +135,9 @@ def _fix_curie_if_broken(curie: str) -> str:
     return curie
 
 def _process_edges_row(conn: sqlite3.Connection,
-                       edge_series: pd.Series) -> \
+                       edge_pandas: NamedTuple) -> \
         tuple[tuple[Optional[dict[str, Any]], str, str], ...]:
-    edge = edge_series.to_dict()
+    edge = edge_pandas._asdict()
     kg2pre_edge_id = edge['id']
     res_edge = {k: edge[k] for k in EDGE_PROPERTIES_COPY_FROM_KG2PRE}
     res_edge['id'] = None  # this will eventually be a global integer index
@@ -175,7 +175,7 @@ def _process_edges_row(conn: sqlite3.Connection,
                  f"{kg2pre_object_curie}"),)
     if len(picked_pref_curies_subject) > 2 or \
        len(picked_pref_curies_object) > 2:
-        print(edge_series)
+        print(edge_pandas)
         assert False
     res: list[tuple[Optional[dict[str, Any]], str, str]] = []
     for subject_curie, object_curie in it.product(picked_pref_curies_subject,
@@ -197,11 +197,7 @@ def _make_process_chunk_of_edges(db_filename: str) -> Callable:
         with lb.connect_to_db_read_only(db_filename) as conn:
             process_edges = functools.partial(_process_edges_row, conn)
             # iterate over rows in the data frame
-            row_iter = edge_chunk.iterrows()
-
-            # each row contains a tuple of a row index and the dictionary contents
-            # of the edge; just grab the latter
-            edges_iter = map(operator.itemgetter(1), row_iter)
+            edges_iter = edge_chunk.itertuples(index=False)
 
             # process the edges in this single chunk
             mapped_edges_iter = map(process_edges, edges_iter)
