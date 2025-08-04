@@ -1,11 +1,14 @@
 import argparse
+import gzip
 import itertools
+import json
 import tempfile
 import urllib
 from typing import Any, Iterable, Iterator, TypeVar, Union, cast
 
 import bmt
 import numpy as np
+import pandas as pd
 import requests
 
 CONFLATION_TYPE_NAMES_IDS = \
@@ -86,3 +89,24 @@ def get_line_chunks_from_url(url: str, chunk_size: int) -> Iterable[list[str]]:
     lines = get_lines_from_url(url)
     return chunked(lines, chunk_size)
 
+
+
+def read_jsonl_file_chunks(filename: str,
+                           lines_per_chunk: int) -> Iterable[pd.DataFrame]:
+    open_func = gzip.open if filename.endswith(".gz") else open
+    with open_func(filename, "rt", encoding="utf-8") as f:
+        chunk = []
+        for line in f:
+            chunk.append(json.loads(line))
+            if len(chunk) >= lines_per_chunk:
+                yield pd.DataFrame(chunk)
+                chunk.clear()
+        if chunk:
+            yield pd.DataFrame(chunk)
+
+def write_jsonl_file(recs_iter: Iterable[dict],
+                     file_name: str):
+    with open(file_name, 'w') as fo:
+        for record in recs_iter:
+            json.dump(record, fo, ensure_ascii=False)
+            fo.write("\n")
