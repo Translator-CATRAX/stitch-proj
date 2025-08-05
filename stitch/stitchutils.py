@@ -7,6 +7,7 @@ import urllib
 from typing import Any, Iterable, Iterator, TypeVar, Union, cast
 
 import bmt
+import jsonlines
 import numpy as np
 import pandas as pd
 import requests
@@ -95,14 +96,28 @@ def read_jsonl_file_chunks(filename: str,
                            lines_per_chunk: int) -> Iterable[pd.DataFrame]:
     open_func = gzip.open if filename.endswith(".gz") else open
     with open_func(filename, "rt", encoding="utf-8") as f:
+        reader = jsonlines.Reader(f)
         chunk = []
-        for line in f:
-            chunk.append(json.loads(line))
+        for obj in reader:
+            chunk.append(obj)
             if len(chunk) >= lines_per_chunk:
                 yield pd.DataFrame(chunk)
                 chunk.clear()
         if chunk:
             yield pd.DataFrame(chunk)
+
+# def read_jsonl_file_chunks(filename: str,
+#                            lines_per_chunk: int) -> Iterable[pd.DataFrame]:
+#     open_func = gzip.open if filename.endswith(".gz") else open
+#     with open_func(filename, "rt", encoding="utf-8") as f:
+#         chunk = []
+#         for line in f:
+#             chunk.append(json.loads(line))
+#             if len(chunk) >= lines_per_chunk:
+#                 yield pd.DataFrame(chunk)
+#                 chunk.clear()
+#         if chunk:
+#             yield pd.DataFrame(chunk)
 
 def write_jsonl_file(recs_iter: Iterable[dict],
                      file_name: str):
