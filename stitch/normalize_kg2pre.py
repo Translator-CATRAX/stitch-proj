@@ -20,7 +20,7 @@ T = TypeVar("T")
 R = TypeVar("R")
 
 DEFAULT_CHUNK_SIZE = 10_000
-DEFAULT_ESTIM_NUM_EDGES = 27_257_461
+DEFAULT_ESTIM_NUM_EDGES = 57_803_754
 
 def _predicate_curie_to_space_case(curie: str) -> str: # noqa
     return curie[len('biolink:'):].replace('_', ' ')
