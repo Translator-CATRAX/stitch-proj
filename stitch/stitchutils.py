@@ -10,6 +10,8 @@ import bmt
 import numpy as np
 import pandas as pd
 import requests
+import jsonlines
+import shutil
 
 CONFLATION_TYPE_NAMES_IDS = \
     {'DrugChemical': 1,
@@ -110,3 +112,36 @@ def write_jsonl_file(recs_iter: Iterable[dict],
         for record in recs_iter:
             json.dump(record, fo, ensure_ascii=False)
             fo.write("\n")
+def create_single_jsonlines(test_mode: bool = False):
+    sort_keys = not test_mode
+
+    temp_output_file_name = tempfile.mkstemp(prefix='stitch-')[1]
+
+    temp_output_file = open(temp_output_file_name, 'w')
+
+    temp_output_jsonlines = jsonlines.Writer(temp_output_file, sort_keys=sort_keys)
+
+    return (temp_output_jsonlines, temp_output_file, temp_output_file_name)
+
+
+def close_single_jsonlines(info: tuple, output_file_name: str):
+    (temp_output_jsonlines, temp_output_file, temp_output_file_name) = info
+
+    shutil.move(temp_output_file_name, output_file_name)
+
+    temp_output_jsonlines.close()
+
+    temp_output_file.close()
+
+
+def start_read_jsonlines(file_name: str, type=dict):
+    file = open(file_name, 'r')
+    jsonlines_reader = jsonlines.Reader(file)
+    return (jsonlines_reader.iter(type=type), jsonlines_reader, file)
+
+
+def end_read_jsonlines(read_jsonlines_info):
+    (_, jsonlines_reader, file) = read_jsonlines_info
+    file.close()
+    jsonlines_reader.close()
+
