@@ -7,6 +7,8 @@ from typing import Any, Iterable, Iterator, TypeVar, Union, cast
 import bmt
 import numpy as np
 import requests
+import jsonlines
+import shutil
 
 CONFLATION_TYPE_NAMES_IDS = \
     {'DrugChemical': 1,
@@ -85,4 +87,38 @@ def get_lines_from_url(url_or_path: str) -> Iterator[str]:
 def get_line_chunks_from_url(url: str, chunk_size: int) -> Iterable[list[str]]:
     lines = get_lines_from_url(url)
     return chunked(lines, chunk_size)
+
+
+def create_single_jsonlines(test_mode: bool = False):
+    sort_keys = not test_mode
+
+    temp_output_file_name = tempfile.mkstemp(prefix='stitch-')[1]
+
+    temp_output_file = open(temp_output_file_name, 'w')
+
+    temp_output_jsonlines = jsonlines.Writer(temp_output_file, sort_keys=sort_keys)
+
+    return (temp_output_jsonlines, temp_output_file, temp_output_file_name)
+
+
+def close_single_jsonlines(info: tuple, output_file_name: str):
+    (temp_output_jsonlines, temp_output_file, temp_output_file_name) = info
+
+    shutil.move(temp_output_file_name, output_file_name)
+
+    temp_output_jsonlines.close()
+
+    temp_output_file.close()
+
+
+def start_read_jsonlines(file_name: str, type=dict):
+    file = open(file_name, 'r')
+    jsonlines_reader = jsonlines.Reader(file)
+    return (jsonlines_reader.iter(type=type), jsonlines_reader, file)
+
+
+def end_read_jsonlines(read_jsonlines_info):
+    (_, jsonlines_reader, file) = read_jsonlines_info
+    file.close()
+    jsonlines_reader.close()
 
