@@ -819,7 +819,8 @@ def _do_final_cleanup(conn: sqlite3.Connection,
             final_cleanup_elapsed_time = \
                 su.format_time_seconds_to_str(time.time() -
                                               final_cleanup_start_time)
-            _log_print("running ANALYZE and VACUUM (final cleanup) took: "
+            _log_print("final cleanup (VACUUM, ANALYZE, and integrity "
+                       "check combined) took: "
                        f"{final_cleanup_elapsed_time} (HHH:MM::SS)")
             _log_print(f"Total number of chunks inserted: {glbl_chnk_cnt}")
             elapsed_time_str = \
