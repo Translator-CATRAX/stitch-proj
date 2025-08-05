@@ -7,7 +7,7 @@ import math
 import multiprocessing
 import operator
 import sqlite3
-from typing import Any, Optional, Protocol, TypeVar
+from typing import Any, Optional
 
 import bmt
 import pandas as pd
@@ -15,9 +15,6 @@ import tqdm
 
 import local_babel as lb
 import stitchutils as su
-
-T = TypeVar("T")
-R = TypeVar("R")
 
 DEFAULT_CHUNK_SIZE = 10_000
 DEFAULT_ESTIM_NUM_EDGES = 57_803_754
@@ -133,9 +130,6 @@ def _fix_curie_if_broken(curie: str) -> str:
     if curie.startswith('OBO:NCIT_'):
         curie = 'NCIT:' + curie[len('OBO:NCIT_'):]
     return curie
-
-class SupportsAsDict(Protocol):
-    def _asdict(self) -> dict[str, Any]: ...
 
 # the "Any" type hint is because Pandas doesn't play
 # well with mypy, specifically when using ".itertuples".
