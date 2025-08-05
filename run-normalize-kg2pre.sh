@@ -26,7 +26,7 @@ edges_output=${4:-"${BUILD_DIR}/stitch-edges-output-split.jsonl"}
 
 date
 
-split -n 16 --numeric-suffixes --additional-suffix .jsonl ${kg2pre_edges} ${BUILD_DIR}/kg2-edges_
+split -n l/16 --numeric-suffixes --additional-suffix .jsonl ${kg2pre_edges} ${BUILD_DIR}/kg2-edges_
 
 date
 
