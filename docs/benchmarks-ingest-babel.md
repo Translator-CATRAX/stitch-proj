@@ -1,7 +1,7 @@
 
 # Benchmarks for a complete Babel ingest using `ingest_babel.ply`
 
-Trial Name | Instance type | Instance name | Commit | Start Time | End Time | Run Time | Peak Memory Usage | Size (kb, `du -k`) | Notes
+Trial Name  | Instance type               | Instance name    | Commit                                                                                                   | Start Time                  | End Time | Run Time | Peak Memory Usage | Size (kb, `du -k`) | Notes
 --|--|--|--|--|--|--|--|--|--
 Last Build  | `c7g.4xlarge` / `gp3`       | `stitch.rtx.ai`  | [`1bbbc50`](https://github.com/Translator-CATRAX/stitch/commit/1bbbc5056aafdaef8a159bee6e11810ffeea7c45) | `2025-07-27T18:29:52+00:00` | ? | 64 hours | ? | 180723968 | 
 Base Trial  | `c7g.4xlarge` / `gp3`       | `stitch.rtx.ai`  | [`ca59970`](https://github.com/Translator-CATRAX/stitch/commit/ca59970c860ef8e82c9cf1563ac71ed491b76660) | `2025-08-05T21:52:42+00:00` | ? | ?        | ? | ? |
