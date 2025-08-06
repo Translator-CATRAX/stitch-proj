@@ -4,10 +4,10 @@ import argparse
 import functools
 import itertools as it
 import math
+import multiprocessing
 import operator
 import sqlite3
-from collections.abc import Callable, Iterable
-from typing import Any, NamedTuple, Optional, TypeVar
+from typing import Any, Optional
 
 import bmt
 import pandas as pd
@@ -16,11 +16,8 @@ import tqdm
 import local_babel as lb
 import stitchutils as su
 
-T = TypeVar("T")
-R = TypeVar("R")
-
 DEFAULT_CHUNK_SIZE = 10_000
-DEFAULT_ESTIM_NUM_EDGES = 27_257_461
+DEFAULT_ESTIM_NUM_EDGES = 57_803_754
 
 def _predicate_curie_to_space_case(curie: str) -> str: # noqa
     return curie[len('biolink:'):].replace('_', ' ')
@@ -69,8 +66,8 @@ EDGE_PROPERTIES_COPY_FROM_KG2PRE_IF_EXIST = \
      'qualified_object_aspect')
 
 PREDICATE_CURIES_SKIP: tuple[str, ...] = \
-    (
-        'biolink:same_as',
+    tuple(
+#        'biolink:same_as',
 #     'biolink:related_to',
 #     'biolink:close_match',
 #     'biolink:subclass_of',
@@ -134,8 +131,10 @@ def _fix_curie_if_broken(curie: str) -> str:
         curie = 'NCIT:' + curie[len('OBO:NCIT_'):]
     return curie
 
+# the "Any" type hint is because Pandas doesn't play
+# well with mypy, specifically when using ".itertuples".
 def _process_edges_row(conn: sqlite3.Connection,
-                       edge_pandas: NamedTuple) -> \
+                       edge_pandas: Any) -> \
         tuple[tuple[Optional[dict[str, Any]], str, str], ...]:
     edge = edge_pandas._asdict()
     kg2pre_edge_id = edge['id']
@@ -190,26 +189,19 @@ def _process_edges_row(conn: sqlite3.Connection,
                     "no preferred curies available"))
     return tuple(res)
 
+def _non_null_first_tuple_entry(t: tuple) -> bool:
+    return t[0] is not None
 
-def _make_process_chunk_of_edges(db_filename: str) -> Callable:
-    def process_chunk_of_edges(edge_chunk: pd.DataFrame) -> \
-            Iterable[tuple[Optional[dict[str, Any]], str, str]]:
-        with lb.connect_to_db_read_only(db_filename) as conn:
-            process_edges = functools.partial(_process_edges_row, conn)
-            # iterate over rows in the data frame
-            edges_iter = edge_chunk.itertuples(index=False)
-
-            # process the edges in this single chunk
-            mapped_edges_iter = map(process_edges, edges_iter)
-
-            # handle cases where a single KG2pre edge got mapped to multiple KG2c edges
-            chained_iter = it.chain.from_iterable(mapped_edges_iter)
-
-            # filter out the edges that failed to map
-            filter_iter = filter(lambda st: st[0] is not None, chained_iter)
-        return filter_iter
-    return process_chunk_of_edges
-
+def _process_chunk_of_edges(db_filename: str,
+                            edge_chunk: pd.DataFrame) -> \
+        list[tuple[Optional[dict[str, Any]], str, str]]:
+    with lb.connect_to_db_read_only(db_filename) as conn:
+        result = []
+        for row in edge_chunk.itertuples(index=False):
+            for entry in _process_edges_row(conn, row):
+                if _non_null_first_tuple_entry(entry):
+                    result.append(entry)
+        return result
 
 def main(nodes_file: str,
          edges_file: str,
@@ -224,16 +216,18 @@ def main(nodes_file: str,
     print(f"number of chunks: {estim_num_chunks}")
     global _pick_category
     _pick_category = _make_pick_category()
-    global _process_edges_row
     chunks_iter = su.read_jsonl_file_chunks(edges_file, chunk_size)
-    process_chunk_of_edges = _make_process_chunk_of_edges(babel_db)
-    mapped_iter = map(process_chunk_of_edges,
-                      chunks_iter)
-    tqdm_iter = tqdm.tqdm(mapped_iter, total=estim_num_chunks, desc="Processing")
-    chained_iter = it.chain.from_iterable(tqdm_iter)
-    filtered_iter = filter(lambda t: t[0] is not None, chained_iter)
-    edges_iter = map(operator.itemgetter(0), filtered_iter)
-    su.write_jsonl_file(edges_iter, edges_output_file)
+    global _process_chunk_of_edges
+    process_chunk_of_edges = functools.partial(_process_chunk_of_edges,
+                                               babel_db)
+    with multiprocessing.pool.Pool() as p:
+        mapped_iter = p.imap_unordered(process_chunk_of_edges,
+                                       chunks_iter)
+        tqdm_iter = tqdm.tqdm(mapped_iter, total=estim_num_chunks, desc="Processing")
+        chained_iter = it.chain.from_iterable(tqdm_iter)
+        filtered_iter = filter(lambda t: t[0] is not None, chained_iter)
+        edges_iter = map(operator.itemgetter(0), filtered_iter)
+        su.write_jsonl_file(edges_iter, edges_output_file)
 
 if __name__ == "__main__":
     main(**su.namespace_to_dict(_get_args()))
