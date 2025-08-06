@@ -19,7 +19,7 @@ source ${config_dir}/master-config.shinc
 
 kg2pre_nodes=${1:-"${BUILD_DIR}/${kg2pre_nodes_filename}"}
 kg2pre_edges=${2:-"${BUILD_DIR}/${kg2pre_edges_filename}"}
-babel_sqlite=${3:-"babel-20250331.sqlite"}
+babel_sqlite=${3:-"${BUILD_DIR}/babel-20250331.sqlite"}
 edges_output=${4:-"${BUILD_DIR}/stitch-edges-output.jsonl"}
 
 ${s3_cp_cmd} s3://${s3_bucket_public}/${babel_sqlite} ${BUILD_DIR}/${babel_sqlite}
