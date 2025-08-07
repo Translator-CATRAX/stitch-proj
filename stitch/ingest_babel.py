@@ -676,7 +676,7 @@ def _make_url_ingester(conn: sqlite3.Connection,
                         log_str += (f"; URL {pct_complete:0.2f}% complete"
                                     f"; time to complete URL: {time_to_complete_str}")
                     _log_print(log_str)
-                if any(chunk_ctr == chunks_per_analyze \
+                if any(chunk_ctr + glbl_chnk_cnt_start == chunks_per_analyze \
                        for chunks_per_analyze in chunks_per_analyze_list):
                     _do_index_analyze(conn, log_work)
             except Exception as e:
