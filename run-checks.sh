@@ -8,6 +8,7 @@ run_vulture_cmd="venv/bin/vulture `find stitch tests -name \*.py ! -name '.#*.py
 files_to_check=(stitch/local_babel.py
                 stitch/ingest_babel.py
                 stitch/row_counts.py
+                stitch/kg2pre_to_kg2c_edges.py
                 tests/conftest.py
                 tests/test_local_babel.py
                 tests/test_ingest_babel.py)

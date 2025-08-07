@@ -23,9 +23,9 @@ def _predicate_curie_to_space_case(curie: str) -> str: # noqa
     return curie[len('biolink:'):].replace('_', ' ')
 
 def _get_args() -> argparse.Namespace:
-    ap = argparse.ArgumentParser(description='normalize_kg2pre.py: '
-                                 'from a JSON-lines format of KG2pre '
-                                 'as input, produce a JSON-lines KG2c')
+    ap = argparse.ArgumentParser(description='kg2pre_to_kg2c_edges.py: '
+                                 'from a JSON-lines format of KG2pre edges'
+                                 'as input, produce a JSON-lines KG2c edges file')
     ap.add_argument('nodes_file',
                     type=str,
                     help=('the nodes JSON-lines file, like kg2-10-3-nodes.jsonl'

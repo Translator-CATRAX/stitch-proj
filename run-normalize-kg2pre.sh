@@ -25,8 +25,7 @@ ${s3_cp_cmd} s3://${s3_bucket_public}/${babel_sqlite} ${BUILD_DIR}/${babel_sqlit
 
 date
 
-${python_command} ${CODE_DIR}/stitch/normalize_kg2pre.py \
-                  ${kg2pre_nodes} \
+${python_command} ${CODE_DIR}/stitch/kg2pre_to_kg2c_edges.py \
                   ${kg2pre_edges} \
                   ${BUILD_DIR}/${babel_sqlite} \
                   ${edges_output}
