@@ -889,6 +889,7 @@ def _make_ingest_urls(dry_run: bool,
                     glbl_chnk_cnt_start: int) -> int:
         ingest_location = base_url if base_url != "" else "(local)"
         _log_print(f"ingesting {file_type} files at: {ingest_location}")
+        glbl_chnk_cnt = glbl_chnk_cnt_start
         for file_name in file_names:
             file_size = file_map[file_name].size
             elapsed_str = _log_start_of_file(start_time_sec, file_type,
@@ -901,7 +902,7 @@ def _make_ingest_urls(dry_run: bool,
                 glbl_chnk_cnt = ingest_url(url,
                                            process_chunk,
                                            total_size=file_size,
-                                           glbl_chnk_cnt_start=glbl_chnk_cnt_start)
+                                           glbl_chnk_cnt_start=glbl_chnk_cnt)
         return glbl_chnk_cnt
     return ingest_urls
 
