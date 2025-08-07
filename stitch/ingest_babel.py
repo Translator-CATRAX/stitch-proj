@@ -662,7 +662,9 @@ def _make_url_ingester(conn: sqlite3.Connection,
                     elapsed_time_str = su.format_time_seconds_to_str(elapsed_time)
                     chunk_elapsed_time_str = su.format_time_seconds_to_str(time.time() -
                                                                            chunk_start_time)
-                    log_str += (f"; time spent on URL: {elapsed_time_str}; "
+                    log_str += ("; total chunks processed: "
+                                f"{glbl_chnk_cnt_start + chunk_ctr}"
+                                f"; time spent on URL: {elapsed_time_str}; "
                                 f"spent on chunk: {chunk_elapsed_time_str}")
                     if total_size is not None:
                         if chunk_ctr == 1:
