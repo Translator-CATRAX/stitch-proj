@@ -455,7 +455,8 @@ def _flatten_taxa(taxa_col: Iterable[Optional[list[str]]]) -> set[str]:
 
 # only set `insrt_missing_taxa` to True for testing!
 def _make_compendia_chunk_processor(conn: sqlite3.Connection,
-                                    insrt_missing_taxa: bool = False) -> Callable:
+                                    insrt_missing_taxa: bool = False,
+                                    non_umls_compendia_file: bool = True) -> Callable:
     def process_compendia_chunk(chunk: pd.DataFrame):
         unique_biolink_categories = list(chunk['type'].unique())
         if unique_biolink_categories:
@@ -478,9 +479,11 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
         curies_and_info = []
         data_to_insert_cliques = []
         primary_curies = []
-
         for id, row in enumerate(chunk.itertuples(index=False, name=None)):
-            bltype, ic, identifiers, preferred_name, taxa = row
+            if non_umls_compendia_file:
+                bltype, ic, identifiers, preferred_name, taxa = row
+            else:
+                bltype, ic, preferred_name, taxa, identifiers = row
             identifiers = cast(list[dict[str, Any]], identifiers)
             primary = identifiers[0]['i'] if identifiers else None
             primary_curies.append(primary)
@@ -702,6 +705,7 @@ TEST_3_COMPENDIA = ('Drug.txt',
                     'ChemicalEntity.txt',
                     'SmallMolecule.txt.01')
 TEST_3_CONFLATION = ('DrugChemical.txt',)
+TEST_4_COMPENDIA = ('umls.txt',)
 TAXON_FILE = 'OrganismTaxon.txt'
 
 FILE_NAME_SUFFIX_START_NUMBERED = COMPENDIA_FILE_SUFFIX + '.00'
@@ -876,7 +880,12 @@ def _get_make_chunkproc_args_conflation(file_to_id_map: dict[str, int],
 
 def _get_make_chunkproc_args_compendia(insrt_missing_taxa: bool,
                                        file_name:str) -> dict[str, Any]:
-    return {'insrt_missing_taxa': insrt_missing_taxa}
+    if file_name != 'umls.txt':
+        non_umls_compendia_file = True
+    else:
+        non_umls_compendia_file = False
+    return {'insrt_missing_taxa': insrt_missing_taxa,
+            'non_umls_compendia_file': non_umls_compendia_file}
 
 def _make_ingest_urls(dry_run: bool,
                       log_work: bool) -> Callable:
@@ -1043,6 +1052,11 @@ def main(babel_compendia_url: str,
                 "glbl_chnk_cnt_start": glbl_chnk_cnt
             })
             glbl_chnk_cnt = ingest_urls(**ingest_args_conflation)
+        elif test_type == 4:
+            ingest_args_compendia.update({
+                "file_names": TEST_4_COMPENDIA,
+            })
+            glbl_chnk_cnt = ingest_urls(**ingest_args_compendia)
         elif test_type is None:
             glbl_chnk_cnt = ingest_urls(**ingest_args_compendia)
             ingest_args_conflation.update({"glbl_chnk_cnt_start": glbl_chnk_cnt})
