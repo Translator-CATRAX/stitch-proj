@@ -480,6 +480,12 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
         data_to_insert_cliques = []
         primary_curies = []
         for id, row in enumerate(chunk.itertuples(index=False, name=None)):
+            # In Babel, the umls.txt file has a different key order than the
+            # other compendia files; so need to handle "umls.txt" as a special
+            # case, and to unpack from the tuple accordingly (WARNING: this
+            # code is kind of brittle; if the Babel key order changes,
+            # the code below will break! We are aiming for speed here
+            # rather than resiliency against a possible future key order change).
             if non_umls_compendia_file:
                 bltype, ic, identifiers, preferred_name, taxa = row
             else:
@@ -880,6 +886,9 @@ def _get_make_chunkproc_args_conflation(file_to_id_map: dict[str, int],
 
 def _get_make_chunkproc_args_compendia(insrt_missing_taxa: bool,
                                        file_name:str) -> dict[str, Any]:
+    # In Babel, the umls.txt file has a different key order than the
+    # other compendia files; so need to handle "umls.txt" as a special
+    # case, and to pass that information to the chunk processor
     if file_name != 'umls.txt':
         non_umls_compendia_file = True
     else:
