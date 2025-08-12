@@ -77,7 +77,7 @@ the full set of dependencies.
 - `tail -f ingest-babel.log` (so you can watch progress)
 - In another terminal session, watch memory usage using `top`
 
-After approximately 64 hours, the ingest script should save the database as a file
+After approximately 28 hours, the ingest script should save the database as a file
 `/home/ubuntu/stitch/babel.sqlite`; as of the March 31, 2025 release of Babel, the
 `babel.sqlite` file produced by the `ingest_babel.py` script is 172 GiB.
 
