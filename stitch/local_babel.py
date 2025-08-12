@@ -196,6 +196,8 @@ LEFT JOIN identifiers_descriptions as idd ON idd.identifier_id = prim_identif.id
 LEFT JOIN descriptions AS descrip ON descrip.id = idd.description_id
 WHERE sec_identif.curie = ?;"""  # noqa W291
     rows = conn.execute(s, (curie,)).fetchall()
+
+    # TODO: make these keys not hard coded in so that other files don't have to worry about changes
     return tuple({'id': {'identifier': row[0],
                          'description': row[3],
                          'label': row[4]},
