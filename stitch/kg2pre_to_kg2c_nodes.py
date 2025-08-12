@@ -61,7 +61,7 @@ def main(nodes_file: str,
     print(f"babel-db file is: {babel_db}")
 
     with lb.connect_to_db_read_only(babel_db) as conn:
-        get_nodes_set(process_nodes)
+        process_nodes(conn, nodes_file)
 
 
 if __name__ == "__main__":
