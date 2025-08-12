@@ -62,7 +62,7 @@ DEFAULT_COMPENDIA_TEST_FILE = "test-tiny.jsonl"
 DEFAULT_LINES_PER_CHUNK = 100_000
 WAL_SIZE = 1000
 
-UNKNOWN_TAXON = "unknown taxon"  # this is ony to be used in testing
+UNKNOWN_TAXON = "unknown taxon"  # this is used in testing
 
 def _get_args() -> argparse.Namespace:
     arg_parser = argparse.ArgumentParser(description='ingest_babel.py: '
@@ -559,13 +559,12 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
             for taxon_curie, taxon_id in taxa_to_pkids.items():
                 if taxon_id is None:
                     if insrt_missing_taxa:
-                        id = \
-                            _insert_and_return_id(cursor,
-                                                  'INSERT INTO identifiers '
-                                                  '(curie, label) '
-                                                  f'VALUES (?, \'{UNKNOWN_TAXON}\')'
-                                                  'RETURNING id;',
-                                                  (taxon_curie,))
+                        id = _insert_and_return_id(cursor,
+                                                   'INSERT INTO identifiers '
+                                                   '(curie, label) '
+                                                   f'VALUES (?, \'{UNKNOWN_TAXON}\')'
+                                                   'RETURNING id;',
+                                                   (taxon_curie,))
                         taxa_to_pkids[taxon_curie] = id
                     else:
                         raise ValueError("taxon missing from database: "
