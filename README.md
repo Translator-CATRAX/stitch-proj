@@ -77,7 +77,7 @@ the full set of dependencies.
 - `tail -f ingest-babel.log` (so you can watch progress)
 - In another terminal session, watch memory usage using `top`
 
-After approximately 64 hours, the ingest script should save the database as a file
+After approximately 28 hours, the ingest script should save the database as a file
 `/home/ubuntu/stitch/babel.sqlite`; as of the March 31, 2025 release of Babel, the
 `babel.sqlite` file produced by the `ingest_babel.py` script is 172 GiB.
 
@@ -210,6 +210,23 @@ When it stops, you need to put your AWS credentials in
 4. Normalize KG2pre
 ```
 bash -x stitch-code/run-normalize-kg2pre.sh
+```
+
+# Setup instructions for running `ingest_babel.py` in an `i4i.2xlarge` instance
+The first time you start the instance:
+```
+ln -s /mnt/localssd /home/ubuntu/stitch
+```
+Then, every time you start the instance:
+```
+sudo mkdir -p /mnt/localssd
+sudo lsblk
+```
+The last command (`sudo lsblk`) should provide the name of the 1.7 TiB local SSD device,
+like `/dev/nvme1n1`. Use that in place of "`/dev/nvme1n1`" below.
+```
+sudo mkfs.ext4 /dev/nvme1n1
+sudo mount /dev/nvme1n1 /mnt/localssd
 ```
 
 # How to cite Babel in a publication
