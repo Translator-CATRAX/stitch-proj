@@ -379,7 +379,7 @@ def _ingest_biolink_categories(biolink_categories: set[str],
         # Faster writes, but less safe
         conn.execute("BEGIN TRANSACTION;")
         conn.cursor().executemany("INSERT INTO types (curie) VALUES (?);",
-                                  tuple((i,) for i in biolink_categories))
+                                  tuple((i,) for i in sorted(biolink_categories)))
         conn.commit()
     except Exception as e:
         conn.rollback()
