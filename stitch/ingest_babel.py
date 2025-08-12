@@ -62,7 +62,7 @@ DEFAULT_COMPENDIA_TEST_FILE = "test-tiny.jsonl"
 DEFAULT_LINES_PER_CHUNK = 100_000
 WAL_SIZE = 1000
 
-UNKNOWN_TAXON = "unknown taxon"  # this is used in testing
+UNKNOWN_TAXON = "unknown taxon"  # this is needed for certain built-in test cases
 
 def _get_args() -> argparse.Namespace:
     arg_parser = argparse.ArgumentParser(description='ingest_babel.py: '
