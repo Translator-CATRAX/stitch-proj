@@ -89,7 +89,11 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
             if len(preferred_node_category) > 0:
                 for one_preferred_node_category in preferred_node_category:
                     if one_preferred_node_category in {"biolink:Protein", "biolink:Gene"}:
-                        preferred_node_organism_taxon = lb.get_taxon_for_gene_or_protein(conn, preferred_node_curie)
+                        try:
+                            preferred_node_organism_taxon = lb.get_taxon_for_gene_or_protein(conn, preferred_node_curie)
+                        except:
+                            print(preferred_node_curie)
+                            assert False
 
                         if not _is_str_none_or_empty(preferred_node_organism_taxon):
                             preferred_node_dict[TAXON_KEY] = preferred_node_organism_taxon
