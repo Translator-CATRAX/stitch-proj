@@ -47,7 +47,9 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
 
     kg2c_nodes = dict()
 
+    node_count = 0
     for node in nodes:
+        node_count += 1
         node_curie = node[CURIE_ID_KEY]
         node_publications = node[PUBLICATIONS_KEY]
         node_description = node[DESCRIPTION_KEY]
@@ -101,6 +103,9 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
                 preferred_node_dict[PUBLICATIONS_KEY] = node_publications
 
             kg2c_nodes[preferred_node_curie] = preferred_node_dict
+
+        if node_count % 100000 == 0:
+            print(node_count, "nodes processed.")
 
     su.end_read_jsonlines(nodes_read_jsonlines_info)
 
