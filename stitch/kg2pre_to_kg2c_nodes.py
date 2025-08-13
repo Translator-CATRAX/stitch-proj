@@ -84,11 +84,14 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
             if not _is_str_none_or_empty(preferred_node_description):
                 preferred_node_dict[DESCRIPTION_KEY] = preferred_node_description
 
-            if preferred_node_category in {"biolink:Protein", "biolink:Gene"}:
-                preferred_node_organism_taxon = lb.get_taxon_for_gene_or_protein(conn, preferred_node_curie)
+            if len(preferred_node_category) > 0:
+                for one_preferred_node_category in preferred_node_category:
+                    if one_preferred_node_category in {"biolink:Protein", "biolink:Gene"}:
+                        preferred_node_organism_taxon = lb.get_taxon_for_gene_or_protein(conn, preferred_node_curie)
 
-                if not _is_str_none_or_empty(preferred_node_organism_taxon):
-                    preferred_node_dict[TAXON_KEY] = preferred_node_organism_taxon
+                        if not _is_str_none_or_empty(preferred_node_organism_taxon):
+                            preferred_node_dict[TAXON_KEY] = preferred_node_organism_taxon
+                            break # only need to get this once
 
             preferred_node_synonyms = lb.map_pref_curie_to_synonyms(cursor, preferred_node_curie) # Note, these are curies, not synonym names
             if not _is_list_none_or_empty(preferred_node_synonyms):
