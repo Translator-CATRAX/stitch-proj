@@ -90,7 +90,7 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
                 for one_preferred_node_category in preferred_node_category:
                     if one_preferred_node_category in {"biolink:Protein", "biolink:Gene"}:
                         try:
-                            preferred_node_organism_taxon = lb.get_taxon_for_gene_or_protein(conn, (preferred_node_curie))
+                            preferred_node_organism_taxon = lb.get_taxon_for_gene_or_protein(conn, preferred_node_curie)
                         except:
                             print(preferred_node_curie)
                             assert False

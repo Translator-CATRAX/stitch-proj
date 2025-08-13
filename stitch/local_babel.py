@@ -275,10 +275,9 @@ def get_table_row_counts(conn: sqlite3.Connection) -> dict[str, int]:
 
 def get_taxon_for_gene_or_protein(conn: sqlite3.Connection,
                                   curie: str) -> Optional[str]:
-    row = conn.cursor().execute("""
-    SELECT id2.curie FROM identifiers AS id1
-    INNER JOIN identifiers_taxa ON identifiers_taxa.identifier_id = id1.id
-    INNER JOIN identifiers AS id2 ON identifiers_taxa.taxa_identifier_id = id2.id
-    WHERE id1.curie = ?;
-    """, curie).fetchone()
+    command = "SELECT id2.curie FROM identifiers AS id1 \
+               INNER JOIN identifiers_taxa ON identifiers_taxa.identifier_id = id1.id \
+               INNER JOIN identifiers AS id2 ON identifiers_taxa.taxa_identifier_id = id2.id \
+               WHERE id1.curie = " + curie + ";"
+    row = conn.cursor().execute(command).fetchone()
     return row[0] if row else None
