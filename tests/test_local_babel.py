@@ -106,10 +106,13 @@ def test_map_curies_to_conflation_curies(db_filename: str):
 
 def test_get_taxon_for_gene_or_protein(readonly_conn):
     curie = get_taxon_for_gene_or_protein(readonly_conn,
-                                          ('NCBIGene:3569',))
+                                          'NCBIGene:3569')
     assert curie == 'NCBITaxon:9606'
     curie = get_taxon_for_gene_or_protein(readonly_conn,
-                                          ('XYZZY:234334',))
+                                          'NCBIGene:41')
+    assert curie == 'NCBITaxon:10090'
+    curie = get_taxon_for_gene_or_protein(readonly_conn,
+                                          'XYZZY:234334')
     assert curie is None
 
 

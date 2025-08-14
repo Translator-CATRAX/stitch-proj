@@ -278,5 +278,5 @@ def get_taxon_for_gene_or_protein(conn: sqlite3.Connection,
     INNER JOIN identifiers_taxa ON identifiers_taxa.identifier_id = id1.id
     INNER JOIN identifiers AS id2 ON identifiers_taxa.taxa_identifier_id = id2.id
     WHERE id1.curie = ?;
-    """, curie).fetchone()
+    """, (curie, )).fetchone()
     return row[0] if row else None
