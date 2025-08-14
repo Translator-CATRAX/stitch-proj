@@ -69,6 +69,8 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
             if _is_str_none_or_empty(preferred_node_curie) or _is_str_none_or_empty(preferred_node_name) or _is_list_none_or_empty(preferred_node_category):
                 continue # Can't export if not all required properties are present; TODO: throw error
 
+            preferred_node_description = node_clique['id']['description']
+
             # Start building the output
             preferred_node_dict = dict()
             if preferred_node_curie in kg2c_nodes:
@@ -78,13 +80,16 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
                 elif not _is_list_none_or_empty(node_publications):
                     kg2c_nodes[preferred_node_curie][PUBLICATIONS_KEY] = sorted(node_publications)
                 continue # Then move to next loop
+
+                if DESCRIPTION_KEY not in kg2c_nodes[preferred_node_curie] and _is_str_none_or_empty(preferred_node_description):
+                    if preferred_node_curie == node_curie and not _is_str_none_or_empty(preferred_node_description):
+                        preferred_node_dict[DESCRIPTION_KEY] = node_description
             
             preferred_node_dict[CURIE_ID_KEY] = preferred_node_curie
             preferred_node_dict[NAME_KEY] = preferred_node_name
             preferred_node_dict[CATEGORY_KEY] = preferred_node_category
 
             # TODO: need description processing for if preferred_node_curie in kg2c_nodes
-            preferred_node_description = node_clique['id']['description']
             if _is_str_none_or_empty(preferred_node_description):
                 if preferred_node_curie == node_curie: # Description choosing system discussed with SAR on slack
                     preferred_node_description = node_description
@@ -95,11 +100,7 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
             if len(preferred_node_category) > 0:
                 for one_preferred_node_category in preferred_node_category:
                     if one_preferred_node_category in {"biolink:Protein", "biolink:Gene"}:
-                        try:
-                            preferred_node_organism_taxon = lb.get_taxon_for_gene_or_protein(conn, preferred_node_curie)
-                        except:
-                            print(preferred_node_curie)
-                            assert False
+                        preferred_node_organism_taxon = lb.get_taxon_for_gene_or_protein(conn, preferred_node_curie)
 
                         if not _is_str_none_or_empty(preferred_node_organism_taxon):
                             preferred_node_dict[TAXON_KEY] = preferred_node_organism_taxon
@@ -107,7 +108,7 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
 
             preferred_node_synonyms = lb.map_pref_curie_to_synonyms(cursor, preferred_node_curie) # Note, these are curies, not synonym names
             if not _is_list_none_or_empty(preferred_node_synonyms):
-                preferred_node_dict[SYNONYM_KEY] = preferred_node_synonyms
+                preferred_node_dict[SYNONYM_KEY] = sorted(list(preferred_node_synonyms))
 
             if not _is_list_none_or_empty(node_publications):
                 preferred_node_dict[PUBLICATIONS_KEY] = node_publications
@@ -118,6 +119,7 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
                 json.dumps(preferred_node_dict)
             except:
                 print(preferred_node_dict)
+                assert False
 
         if node_count % 100000 == 0:
             print(node_count, "nodes processed.")
