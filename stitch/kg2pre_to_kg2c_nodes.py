@@ -5,6 +5,7 @@ import sqlite3
 from typing import Any, Optional
 import local_babel as lb
 import stitchutils as su
+import datetime
 
 # Fill in with kg2_util.py when merged
 CURIE_ID_KEY = 'id'
@@ -15,6 +16,9 @@ NAME_KEY = 'name'
 CATEGORY_KEY = 'category'
 SYNONYM_KEY = 'synonym'
 TAXON_KEY = 'in_taxon' # Not in KGX yet
+
+def date():
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 def _get_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description='kg2pre_to_kg2c_nodes.py: '
@@ -78,6 +82,7 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
             preferred_node_dict[NAME_KEY] = preferred_node_name
             preferred_node_dict[CATEGORY_KEY] = preferred_node_category
 
+            # TODO: need description processing for if preferred_node_curie in kg2c_nodes
             preferred_node_description = node_clique['id']['description']
             if _is_str_none_or_empty(preferred_node_description):
                 if preferred_node_curie == node_curie: # Description choosing system discussed with SAR on slack
@@ -107,6 +112,7 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
                 preferred_node_dict[PUBLICATIONS_KEY] = node_publications
 
             kg2c_nodes[preferred_node_curie] = preferred_node_dict
+            print(json.dumps(preferred_node_dict))
 
         if node_count % 100000 == 0:
             print(node_count, "nodes processed.")
@@ -125,12 +131,14 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
 def main(nodes_file: str,
          babel_db: str,
          nodes_output_file: str):
+    print("Starting time:", date())
     print(f"nodes file is: {nodes_file}")
     print(f"babel-db file is: {babel_db}")
 
     with lb.connect_to_db_read_only(babel_db) as conn:
         process_nodes(conn, nodes_file, nodes_output_file)
 
+    print("Ending time:", date())
 
 if __name__ == "__main__":
     main(**su.namespace_to_dict(_get_args()))
