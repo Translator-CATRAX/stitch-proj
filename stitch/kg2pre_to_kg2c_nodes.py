@@ -67,7 +67,8 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
             preferred_node_name = node_clique['id']['label']
             preferred_node_category = node_clique['type']
             if _is_str_none_or_empty(preferred_node_curie) or _is_str_none_or_empty(preferred_node_name) or _is_list_none_or_empty(preferred_node_category):
-                continue # Can't export if not all required properties are present; TODO: throw error
+                print("Warning: skipping", preferred_node_curie, "due to missing required information.")
+                continue # Can't export if not all required properties are present
 
             preferred_node_description = node_clique['id']['description']
 
@@ -79,12 +80,13 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
                     kg2c_nodes[preferred_node_curie][PUBLICATIONS_KEY] = sorted(list(set(kg2c_nodes[preferred_node_curie][PUBLICATIONS_KEY]) | set(node_publications)))
                 elif not _is_list_none_or_empty(node_publications):
                     kg2c_nodes[preferred_node_curie][PUBLICATIONS_KEY] = sorted(node_publications)
-                continue # Then move to next loop
 
                 # If this node curie matches the preferred curie and the node didn't already have a description, save the KG2pre description
                 if DESCRIPTION_KEY not in kg2c_nodes[preferred_node_curie] and _is_str_none_or_empty(preferred_node_description):
                     if preferred_node_curie == node_curie and not _is_str_none_or_empty(preferred_node_description):
                         preferred_node_dict[DESCRIPTION_KEY] = node_description
+
+                continue # Then move to next loop, since we already have the rest of the data
             
             preferred_node_dict[CURIE_ID_KEY] = preferred_node_curie
             preferred_node_dict[NAME_KEY] = preferred_node_name
@@ -143,4 +145,3 @@ def main(nodes_file: str,
 
 if __name__ == "__main__":
     main(**su.namespace_to_dict(_get_args()))
-
