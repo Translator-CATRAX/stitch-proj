@@ -6,6 +6,7 @@ from typing import Any, Optional
 import local_babel as lb
 import stitchutils as su
 import datetime
+import json
 
 # Fill in with kg2_util.py when merged
 CURIE_ID_KEY = 'id'
@@ -112,7 +113,11 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
                 preferred_node_dict[PUBLICATIONS_KEY] = node_publications
 
             kg2c_nodes[preferred_node_curie] = preferred_node_dict
-            print(json.dumps(preferred_node_dict))
+
+            try:
+                json.dumps(preferred_node_dict)
+            except:
+                print(preferred_node_dict)
 
         if node_count % 100000 == 0:
             print(node_count, "nodes processed.")
