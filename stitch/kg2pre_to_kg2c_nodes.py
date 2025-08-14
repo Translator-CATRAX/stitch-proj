@@ -52,6 +52,10 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
 
     kg2c_nodes = dict()
 
+    curie_skipped = set()
+    name_skipped = set()
+    category_skipped = set()
+
     node_count = 0
     for node in nodes:
         node_count += 1
@@ -67,7 +71,13 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
             preferred_node_name = node_clique['id']['label']
             preferred_node_category = node_clique['type']
             if _is_str_none_or_empty(preferred_node_curie) or _is_str_none_or_empty(preferred_node_name) or _is_list_none_or_empty(preferred_node_category):
-                print("Warning: skipping", preferred_node_curie, "due to missing required information.")
+                if _is_str_none_or_empty(preferred_node_curie):
+                    curie_skipped.add(node_curie)
+                if _is_str_none_or_empty(preferred_node_name):
+                    name_skipped.add(node_curie)
+                if _is_list_none_or_empty(preferred_node_category):
+                    category_skipped.add(node_curie)
+
                 continue # Can't export if not all required properties are present
 
             preferred_node_description = node_clique['id']['description']
@@ -121,6 +131,11 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
             print(node_count, "nodes processed.")
 
     su.end_read_jsonlines(nodes_read_jsonlines_info)
+
+    print("Finished processing nodes.")
+    print(curie_skipped, "skipped due to missing preferred curie. This is a total of", len(curie_skipped), "nodes excluded.")
+    print(name_skipped, "skipped due to missing preferred name. This is a total of", len(name_skipped), "nodes excluded.")
+    print(category_skipped, "skipped due to missing preferred category. This is a total of", len(category_skipped), "nodes excluded.")
 
     nodes_output_info = su.create_single_jsonlines()
     nodes_output = nodes_output_info[0]
