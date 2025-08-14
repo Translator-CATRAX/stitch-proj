@@ -81,6 +81,7 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
                     kg2c_nodes[preferred_node_curie][PUBLICATIONS_KEY] = sorted(node_publications)
                 continue # Then move to next loop
 
+                # If this node curie matches the preferred curie and the node didn't already have a description, save the KG2pre description
                 if DESCRIPTION_KEY not in kg2c_nodes[preferred_node_curie] and _is_str_none_or_empty(preferred_node_description):
                     if preferred_node_curie == node_curie and not _is_str_none_or_empty(preferred_node_description):
                         preferred_node_dict[DESCRIPTION_KEY] = node_description
@@ -89,7 +90,6 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
             preferred_node_dict[NAME_KEY] = preferred_node_name
             preferred_node_dict[CATEGORY_KEY] = preferred_node_category
 
-            # TODO: need description processing for if preferred_node_curie in kg2c_nodes
             if _is_str_none_or_empty(preferred_node_description):
                 if preferred_node_curie == node_curie: # Description choosing system discussed with SAR on slack
                     preferred_node_description = node_description
@@ -114,12 +114,6 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
                 preferred_node_dict[PUBLICATIONS_KEY] = node_publications
 
             kg2c_nodes[preferred_node_curie] = preferred_node_dict
-
-            try:
-                json.dumps(preferred_node_dict)
-            except:
-                print(preferred_node_dict)
-                assert False
 
         if node_count % 100000 == 0:
             print(node_count, "nodes processed.")
