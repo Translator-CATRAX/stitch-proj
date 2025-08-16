@@ -58,12 +58,14 @@ EDGE_PROPERTIES_COPY_FROM_KG2PRE = \
      'knowledge_level',
      'predicate',
      'primary_knowledge_source',
-     'domain_range_exclusion')
+     'domain_range_exclusion',)
 
 EDGE_PROPERTIES_COPY_FROM_KG2PRE_IF_EXIST = \
     ('qualified_predicate',
      'qualified_object_direction',
-     'qualified_object_aspect')
+     'qualified_object_aspect',
+     'publications',
+     'publications_info')
 
 PREDICATE_CURIES_SKIP: tuple[str, ...] = \
     tuple(
@@ -131,6 +133,12 @@ def _fix_curie_if_broken(curie: str) -> str:
         curie = 'NCIT:' + curie[len('OBO:NCIT_'):]
     return curie
 
+# Returns a boolean based on whether or not an entity (str, list, or dict) exists
+def _check_if_property_exists(prop_val: Any):
+    if prop_val == {} or prop_val == []:
+        return False
+    return su.nan_to_none(prop_val)
+
 # the "Any" type hint is because Pandas doesn't play
 # well with mypy, specifically when using ".itertuples".
 def _process_edges_row(conn: sqlite3.Connection,
@@ -151,7 +159,7 @@ def _process_edges_row(conn: sqlite3.Connection,
                  f"predicate is on the skip list: {predicate}"),)
     res_edge.update({k: edge[k] for k in \
                      EDGE_PROPERTIES_COPY_FROM_KG2PRE_IF_EXIST
-                     if su.nan_to_none(edge[k])})
+                     if _check_if_property_exists(edge[k])})
     kg2pre_subject_curie = _fix_curie_if_broken(edge['subject'])
     pref_curie_tuple = lb.map_curie_to_preferred_curies(conn,
                                                         kg2pre_subject_curie)
