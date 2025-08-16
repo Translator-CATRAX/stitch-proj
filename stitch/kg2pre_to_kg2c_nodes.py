@@ -17,6 +17,7 @@ NAME_KEY = 'name'
 CATEGORY_KEY = 'category'
 SYNONYM_KEY = 'synonym'
 TAXON_KEY = 'in_taxon' # Not in KGX yet
+CHEMBL_COMPOUND_PREFIX = 'CHEMBL.COMPOUND'
 
 def date():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -43,6 +44,9 @@ def _is_str_none_or_empty(in_str: str):
 def _is_list_none_or_empty(in_list: list):
     return in_list is None or in_list == []
 
+def _is_chembl_compound(node_curie: str):
+    return node_curie.split(':')[0] == CHEMBL_COMPOUND_PREFIX
+
 
 def process_nodes(conn, nodes_input_file, nodes_output_file):
     cursor = conn.cursor()
@@ -64,13 +68,20 @@ def process_nodes(conn, nodes_input_file, nodes_output_file):
         node_description = node[DESCRIPTION_KEY]
 
         node_cliques = lb.map_any_curie_to_cliques(conn, node_curie)
+        
+        if _is_list_none_or_empty(node_cliques):
+            curie_skipped.add(node_curie)
 
         for node_clique in node_cliques:
             # Required properties
             preferred_node_curie = node_clique['id']['identifier']
             preferred_node_name = node_clique['id']['label']
             preferred_node_category = node_clique['type']
-            if _is_str_none_or_empty(preferred_node_curie) or _is_str_none_or_empty(preferred_node_name) or _is_list_none_or_empty(preferred_node_category):
+
+            # Special case for CHEMBL.COMPOUND nodes without names (per discussion with SAR on Slack)
+            if _is_str_none_or_empty(preferred_node_name) and _is_chembl_compound(node_curie):
+                preferred_node_name = node_curie.split(':')[1]
+            elif _is_str_none_or_empty(preferred_node_curie) or _is_str_none_or_empty(preferred_node_name) or _is_list_none_or_empty(preferred_node_category):
                 if _is_str_none_or_empty(preferred_node_curie):
                     curie_skipped.add(node_curie)
                 if _is_str_none_or_empty(preferred_node_name):
