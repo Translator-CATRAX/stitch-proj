@@ -110,10 +110,13 @@ def test_get_taxon_for_gene_or_protein(readonly_conn):
     assert curie == 'NCBITaxon:9606'
     curie = get_taxon_for_gene_or_protein(readonly_conn,
                                           'NCBIGene:41')
-    assert curie == 'NCBITaxon:10090'
+    assert curie == 'NCBITaxon:9606'
     curie = get_taxon_for_gene_or_protein(readonly_conn,
                                           'XYZZY:234334')
     assert curie is None
+    curie = get_taxon_for_gene_or_protein(readonly_conn,
+                                          'NCBIGene:16193')
+    assert curie == 'NCBITaxon:10090'
 
 
 def test_map_curie_to_preferred_curies(readonly_conn: sqlite3.Connection):
