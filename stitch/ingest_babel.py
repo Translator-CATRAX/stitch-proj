@@ -37,7 +37,6 @@ from typing import IO, Any, Callable, Iterable, Optional, cast
 import numpy
 import pandas as pd
 import ray
-import swifter  # noqa: F401
 from htmllistparse import htmllistparse
 
 # The "noqa: F401" for "import swifter" is needed because swifter is somehow
@@ -63,6 +62,7 @@ DEFAULT_COMPENDIA_TEST_FILE = "test-tiny.jsonl"
 DEFAULT_LINES_PER_CHUNK = 100_000
 WAL_SIZE = 1000
 
+UNKNOWN_TAXON = "unknown taxon"  # this is needed for certain built-in test cases
 
 def _get_args() -> argparse.Namespace:
     arg_parser = argparse.ArgumentParser(description='ingest_babel.py: '
@@ -379,7 +379,7 @@ def _ingest_biolink_categories(biolink_categories: set[str],
         # Faster writes, but less safe
         conn.execute("BEGIN TRANSACTION;")
         conn.cursor().executemany("INSERT INTO types (curie) VALUES (?);",
-                                  tuple((i,) for i in biolink_categories))
+                                  tuple((i,) for i in sorted(biolink_categories)))
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -447,10 +447,18 @@ def _make_conflation_chunk_processor(conn: sqlite3.Connection,
                                insert_data)
     return process_conflation_chunk
 
+def _flatten_taxa(taxa_col: Iterable[Optional[list[str]]]) -> set[str]:
+    return {taxon
+            for taxon_list in taxa_col
+            if taxon_list
+            for taxon in taxon_list}
+
+# only set `insrt_missing_taxa` to True for testing!
 def _make_compendia_chunk_processor(conn: sqlite3.Connection,
-                                    insrt_missing_taxa: bool = False) -> Callable:
+                                    insrt_missing_taxa: bool = False,
+                                    non_umls_compendia_file: bool = True) -> Callable:
     def process_compendia_chunk(chunk: pd.DataFrame):
-        unique_biolink_categories = chunk['type'].drop_duplicates().tolist()
+        unique_biolink_categories = list(chunk['type'].unique())
         if unique_biolink_categories:
             # Create a string of placeholders like "?, ?, ?..."
             placeholders = ', '.join('?' for _ in unique_biolink_categories)
@@ -468,16 +476,41 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
         else:
             biolink_curie_to_pkid = {}
 
-        cliques_identifiers = chunk.identifiers.tolist()
+        curies_and_info = []
+        data_to_insert_cliques = []
+        primary_curies = []
+        for id, row in enumerate(chunk.itertuples(index=False, name=None)):
+            # In Babel, the umls.txt file has a different key order than the
+            # other compendia files; so need to handle "umls.txt" as a special
+            # case, and to unpack from the tuple accordingly (WARNING: this
+            # code is kind of brittle; if the Babel key order changes,
+            # the code below will break! We are aiming for speed here
+            # rather than resiliency against a possible future key order change).
+            if non_umls_compendia_file:
+                bltype, ic, identifiers, preferred_name, taxa = row
+            else:
+                bltype, ic, preferred_name, taxa, identifiers = row
+            identifiers = cast(list[dict[str, Any]], identifiers)
+            primary = identifiers[0]['i'] if identifiers else None
+            primary_curies.append(primary)
 
-        curies_and_info = tuple((identif_struct['i'],
-                                 identif_struct.get('l', None),
-                                 ci,
-                                 identif_struct.get('t', None),
-                                 id)
-                                for id, (_, row) in enumerate(chunk.iterrows())
-                                for ci, identif_struct
-                                in enumerate(row['identifiers']))
+            for ci, identif_struct in enumerate(identifiers):
+                curies_and_info.append(
+                    (identif_struct['i'],
+                     identif_struct.get('l'),
+                     ci,
+                     identif_struct.get('t'),
+                     id)
+                )
+
+            data_to_insert_cliques.append(
+                (su.nan_to_none(ic),
+                 biolink_curie_to_pkid[bltype],
+                 preferred_name)
+            )
+
+        chunk['primary_curie'] = primary_curies
+        cliques_identifiers = chunk.identifiers.tolist()
 
         # curies_df has four columns: curie, label, cis, and taxa;
         # each row corresponds to a different identifier in the chunk
@@ -491,10 +524,10 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
         curies = curies_df.curie.tolist()
         curie_pkids = dict.fromkeys(curies, None)
         curie_pkids.update(_curies_to_pkids(conn, set(curies)))
-        curies_df['pkid'] = tuple(curie_pkids[curie] for curie in curies)
+        curies_df['pkid'] = curies_df['curie'].map(curie_pkids)
         missing_series = curies_df.pkid.isna()
         missing_df = curies_df.loc[missing_series][['curie', 'label']]
-        missing_df_gb = missing_df.swifter.progress_bar(False).groupby(by='curie')
+        missing_df_gb = missing_df.groupby(by='curie')
         missing_df_dedup = missing_df_gb.apply(_first_label,
                                                include_groups=False)
         missing_df_t = tuple(missing_df_dedup.itertuples(index=True,
@@ -516,8 +549,7 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                                           'pkid']].itertuples(index=False,
                                                               name=None))
 
-        taxa = tuple({taxon for taxon_list in curies_df.taxa.tolist()
-                      for taxon in (taxon_list if taxon_list is not None else [])})
+        taxa = tuple(_flatten_taxa(curies_df['taxa']))
 
         if taxa:
             taxa_to_pkids = dict.fromkeys(set(taxa), None)
@@ -530,7 +562,7 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                         id = _insert_and_return_id(cursor,
                                                    'INSERT INTO identifiers '
                                                    '(curie, label) '
-                                                   'VALUES (?, \'some taxon\')'
+                                                   f'VALUES (?, \'{UNKNOWN_TAXON}\')'
                                                    'RETURNING id;',
                                                    (taxon_curie,))
                         taxa_to_pkids[taxon_curie] = id
@@ -538,30 +570,25 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                         raise ValueError("taxon missing from database: "
                                          f"{taxon_curie}")
 
-            insert_data = tuple((curies_to_pkids[row.iloc[0]],
-                                 taxa_to_pkids[t])
-                                for _, row
-                                in curies_df[['curie', 'taxa']].iterrows()
-                                for t in row.iloc[1])
+            insert_data = tuple(
+                (curies_to_pkids[row_curie],
+                 taxa_to_pkids[t])
+                for row_curie, _, _, row_taxa, _, _
+                in curies_df.itertuples(index=False, name=None)
+                for t in cast(list[str], row_taxa)
+            )
 
             cursor.executemany('INSERT INTO identifiers_taxa '
                                '(identifier_id, taxa_identifier_id) '
                                'VALUES (?, ?);',
                                insert_data)
 
-        chunk['primary_curie'] = [ident_struct['i']
-                                  for _, row
-                                  in chunk.iterrows()
-                                  for subidx, ident_struct
-                                  in enumerate(row.loc['identifiers'])
-                                  if subidx == 0]
+        pkids_for_cliques = tuple(curies_to_pkids[primary_id]
+                                  for primary_id in primary_curies)
 
-        data_to_insert_cliques = tuple(
-            (curies_to_pkids[clique['primary_curie']],
-             su.nan_to_none(clique['ic']),
-             biolink_curie_to_pkid[clique['type']],
-             clique['preferred_name'])
-            for _, clique in chunk.iterrows())
+        data_to_insert_cliques_final = tuple((pkid, *data) \
+                                             for pkid, data in zip(pkids_for_cliques,
+                                                                   data_to_insert_cliques))
 
         clique_pkids = tuple(
             _insert_and_return_id(cursor,
@@ -571,13 +598,15 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                                   'VALUES (?, ?, ?, ?) '
                                   'RETURNING id;',
                                   clique_data)
-            for clique_data in data_to_insert_cliques)
+            for clique_data in data_to_insert_cliques_final)
 
         chunk['clique_pkid'] = clique_pkids
 
+        clique_pkid_list = chunk['clique_pkid'].tolist()
         identifiers_cliques_data = tuple(
-            (row['pkid'], int(chunk.iloc[row['chunk_row']]['clique_pkid']))
-            for id, row in curies_df.iterrows())
+            (row_pkid, int(clique_pkid_list[chunk_row]))
+            for _, _, _, _, chunk_row, row_pkid in curies_df.itertuples(index=False)
+        )
 
         cursor.executemany('INSERT INTO identifiers_cliques '
                            '(identifier_id, clique_id) '
@@ -641,7 +670,9 @@ def _make_url_ingester(conn: sqlite3.Connection,
                     elapsed_time_str = su.format_time_seconds_to_str(elapsed_time)
                     chunk_elapsed_time_str = su.format_time_seconds_to_str(time.time() -
                                                                            chunk_start_time)
-                    log_str += (f"; time spent on URL: {elapsed_time_str}; "
+                    log_str += ("; total chunks processed: "
+                                f"{glbl_chnk_cnt_start + chunk_ctr}"
+                                f"; time spent on URL: {elapsed_time_str}; "
                                 f"spent on chunk: {chunk_elapsed_time_str}")
                     if total_size is not None:
                         if chunk_ctr == 1:
@@ -655,7 +686,7 @@ def _make_url_ingester(conn: sqlite3.Connection,
                         log_str += (f"; URL {pct_complete:0.2f}% complete"
                                     f"; time to complete URL: {time_to_complete_str}")
                     _log_print(log_str)
-                if any(chunk_ctr == chunks_per_analyze \
+                if any(chunk_ctr + glbl_chnk_cnt_start == chunks_per_analyze \
                        for chunks_per_analyze in chunks_per_analyze_list):
                     _do_index_analyze(conn, log_work)
             except Exception as e:
@@ -679,6 +710,7 @@ TEST_3_COMPENDIA = ('Drug.txt',
                     'ChemicalEntity.txt',
                     'SmallMolecule.txt.01')
 TEST_3_CONFLATION = ('DrugChemical.txt',)
+TEST_4_COMPENDIA = ('umls.txt',)
 TAXON_FILE = 'OrganismTaxon.txt'
 
 FILE_NAME_SUFFIX_START_NUMBERED = COMPENDIA_FILE_SUFFIX + '.00'
@@ -798,7 +830,8 @@ def _do_final_cleanup(conn: sqlite3.Connection,
             final_cleanup_elapsed_time = \
                 su.format_time_seconds_to_str(time.time() -
                                               final_cleanup_start_time)
-            _log_print("running ANALYZE and VACUUM (final cleanup) took: "
+            _log_print("final cleanup (VACUUM, ANALYZE, and integrity "
+                       "check combined) took: "
                        f"{final_cleanup_elapsed_time} (HHH:MM::SS)")
             _log_print(f"Total number of chunks inserted: {glbl_chnk_cnt}")
             elapsed_time_str = \
@@ -852,7 +885,15 @@ def _get_make_chunkproc_args_conflation(file_to_id_map: dict[str, int],
 
 def _get_make_chunkproc_args_compendia(insrt_missing_taxa: bool,
                                        file_name:str) -> dict[str, Any]:
-    return {'insrt_missing_taxa': insrt_missing_taxa}
+    # In Babel, the umls.txt file has a different key order than the
+    # other compendia files; so need to handle "umls.txt" as a special
+    # case, and to pass that information to the chunk processor
+    if file_name != 'umls.txt':
+        non_umls_compendia_file = True
+    else:
+        non_umls_compendia_file = False
+    return {'insrt_missing_taxa': insrt_missing_taxa,
+            'non_umls_compendia_file': non_umls_compendia_file}
 
 def _make_ingest_urls(dry_run: bool,
                       log_work: bool) -> Callable:
@@ -867,6 +908,7 @@ def _make_ingest_urls(dry_run: bool,
                     glbl_chnk_cnt_start: int) -> int:
         ingest_location = base_url if base_url != "" else "(local)"
         _log_print(f"ingesting {file_type} files at: {ingest_location}")
+        glbl_chnk_cnt = glbl_chnk_cnt_start
         for file_name in file_names:
             file_size = file_map[file_name].size
             elapsed_str = _log_start_of_file(start_time_sec, file_type,
@@ -879,7 +921,7 @@ def _make_ingest_urls(dry_run: bool,
                 glbl_chnk_cnt = ingest_url(url,
                                            process_chunk,
                                            total_size=file_size,
-                                           glbl_chnk_cnt_start=glbl_chnk_cnt_start)
+                                           glbl_chnk_cnt_start=glbl_chnk_cnt)
         return glbl_chnk_cnt
     return ingest_urls
 
@@ -1018,6 +1060,11 @@ def main(babel_compendia_url: str,
                 "glbl_chnk_cnt_start": glbl_chnk_cnt
             })
             glbl_chnk_cnt = ingest_urls(**ingest_args_conflation)
+        elif test_type == 4:
+            ingest_args_compendia.update({
+                "file_names": TEST_4_COMPENDIA,
+            })
+            glbl_chnk_cnt = ingest_urls(**ingest_args_compendia)
         elif test_type is None:
             glbl_chnk_cnt = ingest_urls(**ingest_args_compendia)
             ingest_args_conflation.update({"glbl_chnk_cnt_start": glbl_chnk_cnt})
