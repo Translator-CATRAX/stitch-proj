@@ -131,3 +131,9 @@ def test_map_curie_to_preferred_curies(readonly_conn: sqlite3.Connection):
     assert res == (('MESH:C115990', 'biolink:ChemicalEntity', 'UMLS:C0000657'),
                    ('UMLS:C0000657', 'biolink:Protein', 'UMLS:C0000657'))
 
+
+def test_map_chembl(readonly_conn: sqlite3.Connection):
+    res = map_curie_to_preferred_curies(readonly_conn, 'CHEMBL.COMPOUND:CHEMBL339829')
+    assert res == (('CHEMBL.COMPOUND:CHEMBL339829',
+                    'biolink:SmallMolecule',
+                    'CHEMBL.COMPOUND:CHEMBL339829'),)
