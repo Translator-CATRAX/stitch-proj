@@ -43,7 +43,7 @@ The Stitch `ingest_babel.py` code has been tested in three compute environments:
 - Ubuntu 24.04
 - `c7g.4xlarge` instance (Graviton3 processor, which is ARM64 architecture), 32 GiB of memory
 - `gp3` root volume (800 GiB)
-- CPython, Numpy, and Pandas need to be compiled locally using gcc/g++ with the following CFLAGS:
+- CPython, Numpy, and Pandas were compiled locally using gcc/g++ with the following CFLAGS:
 ```-mcpu=neoverse-v1 -mtune=neoverse-v1 -march=armv8.4-a+crypto -O3 -pipe```
 - To enable local compilation of CPython, Numpy, and Pandas, the following packages were `apt` installed: `sqlite3`, `build-essential`, `gcc`, `g++`, `make`, `libffi-dev`, `libssl-dev`, `zlib1g-dev`, `libbz2-dev`, `libreadline-dev`, `libsqlite3-dev`, `libncursesw5-dev`, `tk-dev`, `libgdbm-dev`, `libnss3-dev`, `liblzma-dev`, `uuid-dev`, `python3-dev`, `gfortran`, `libopenblas-dev`, `liblapack-dev`, `libfreetype6-dev`, `libpng-dev`, `libjpeg-dev`, `libtiff-dev`, `libffi-dev`, `liblzma-dev`, `pkg-config`, `cmake`, `python3.12-venv`.
 
