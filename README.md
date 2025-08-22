@@ -28,6 +28,7 @@ local Babel sqlite database.
 - To use a local `babel.sqlite` in your application, 200 GiB of free system storage space to store the sqlite file.
 - Linux or MacOS (this software has not been tested on Windows; see "Systems on which this software has been tested").
 - If you want to download the pre-built Babel sqlite database file, you will need to have `curl` or `wget` installed.
+- Optionally, you might want to have `sqlite3_analyzer` installed, if you want detailed database statistics (see instructions below in this page).
 
 # Systems on which this software has been tested
 The Stitch `ingest_babel.py` code has been tested in three compute environments:
