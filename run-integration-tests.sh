@@ -13,21 +13,21 @@ BABEL_CONFLATION_BASE_URL=${BABEL_BASE_URL}/conflation/
 
 rm -f ${STITCH_LOG_FILE}
 
-${STITCH_DIR}/venv/bin/python3.12 -u ${STITCH_DIR}/stitch/ingest_babel.py \
+${STITCH_DIR}/venv/bin/python3 -u ${STITCH_DIR}/stitch/ingest_babel.py \
              --babel-compendia-url ${BABEL_COMPENDIA_BASE_URL} \
              --babel-conflation-url ${BABEL_CONFLATION_BASE_URL} \
              --database-file-name ${STITCH_SQLITE_FILE} \
              --test-type=1
              >>${STITCH_LOG_FILE} 2>&1
 
-${STITCH_DIR}/venv/bin/python3.12 -u ${STITCH_DIR}/stitch/ingest_babel.py \
+${STITCH_DIR}/venv/bin/python3 -u ${STITCH_DIR}/stitch/ingest_babel.py \
              --babel-compendia-url ${BABEL_COMPENDIA_BASE_URL} \
              --babel-conflation-url ${BABEL_CONFLATION_BASE_URL} \
              --database-file-name ${STITCH_SQLITE_FILE} \
              --test-type=2
              >>${STITCH_LOG_FILE} 2>&1
 
-${STITCH_DIR}/venv/bin/python3.12 -u ${STITCH_DIR}/stitch/ingest_babel.py \
+${STITCH_DIR}/venv/bin/python3 -u ${STITCH_DIR}/stitch/ingest_babel.py \
              --babel-compendia-url ${BABEL_COMPENDIA_BASE_URL} \
              --babel-conflation-url ${BABEL_CONFLATION_BASE_URL} \
              --database-file-name ${STITCH_SQLITE_FILE} \

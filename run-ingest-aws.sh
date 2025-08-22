@@ -14,7 +14,7 @@ export SQLITE_TMPDIR=${STITCH_TMP_DIR}
 rm -r -f ${STITCH_TMP_DIR}
 mkdir -p ${STITCH_TMP_DIR}
 
-${STITCH_DIR}/venv/bin/python3.12 -u ${STITCH_DIR}/stitch/ingest_babel.py \
+${STITCH_DIR}/venv/bin/python3 -u ${STITCH_DIR}/stitch/ingest_babel.py \
              --babel-compendia-url ${BABEL_COMPENDIA_BASE_URL} \
              --babel-conflation-url ${BABEL_CONFLATION_BASE_URL} \
              --database-file-name ${STITCH_SQLITE_FILE} \
