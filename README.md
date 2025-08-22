@@ -103,7 +103,7 @@ project. You will need to download (or, alternatively, build from scratch using
 suite for the "stitch" software.
 
 # The local Babel sqlite database schema
-This schema diagram was generated using DbVisualizer Free version 24.3.3.
+This schema diagram was generated using [DbVisualizer](https://www.dbvis.com) Free version 24.3.3.
 ![stitch Babel sqlite3 database schema with conflation](schema.png)
 
 In the `cliques` table, the combination of columns `primary_identifier_id` and
@@ -210,7 +210,7 @@ cd stitch
 venv/bin/python3 stitch/row_counts.py babel.sqlite
 ```
 
-# Setup instructions for running `ingest_babel.py` in an `i4i.2xlarge` instance
+# Special instructions for running `ingest_babel.py` in an `i4i.2xlarge` instance
 The first time you start the instance:
 ```
 ln -s /mnt/localssd /home/ubuntu/stitch
