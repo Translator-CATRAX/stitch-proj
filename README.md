@@ -75,16 +75,17 @@ the full set of dependencies.
 - `git clone https://github.com/Translator-CATRAX/stitch.git`
 - `cd stitch`
 - `python3.12 -m venv venv`
-- `source venv/bin/activate`
-- `pip3 install -r requirements.txt`
+- `venv/bin/pip3 install -r requirements.txt`
 
 # How to run the `stich` Babel sqlite ingest in AWS
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
 - `cd stitch`
-- `screen`
-- `source venv/bin/activate`
-- `./run-ingest-aws.sh`
+- `screen` (to enter a screen session)
+- `./instance-memory-tracker.sh`
 - `ctrl-X D` (to exit the screen session)
+- `screen` (to enter a second screen session)
+- `./run-ingest-aws.sh`
+- `ctrl-X D` (to exit the second screen session)
 - `tail -f ingest-babel.log` (so you can watch progress)
 - In another terminal session, watch memory usage using `top`
 
@@ -171,7 +172,6 @@ curl -s -L https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250331.sqli
 These checks should be run before any commit:
 ```
 cd stitch
-source venv/bin/activate
 ./run-checks.sh
 ```
 which will run type checks (using `mypy`), lint checks (using `ruff`),
@@ -185,21 +185,21 @@ the `babel-20250331.sqlite` file (see section
 Then you can run the unit test suite, like this:
 ```
 cd stitch
-source venv/bin/activate
-pytest -v
+venv/bin/pytest -v
 ```
 # How to run the integration tests of ingest_babel.py
 ```
 cd stitch
-source venv/bin/activate
 ./run-integration-tests.sh
 ```
 
 # How to regenerate the schema diagram
 
-Use the `ingest_babel.py` script to generate the `ddl.sql` file as follows: ```
-source venv/bin/activate python3 stitch/ingest_babel.sql --print-ddl --dry-run
-2>ddl.sql ``` On macOS, run the DbVisualizer application (free version
+Use the `ingest_babel.py` script to generate the `ddl.sql` file as follows: 
+```
+venv/bin/python3 stitch/ingest_babel.sql --print-ddl --dry-run 2>ddl.sql 
+``` 
+On macOS, run the DbVisualizer application (free version
 24.3.3). Under the "File" menu select "Open File...", then navigate to the new
 `ddl.sql` file.  In the treeview control under "SQLite" on the left, open
 "Schema" and click on "Tables". In the "Tables" view in the main application
@@ -211,8 +211,7 @@ obtain a PNG of the schema diagram.
 Run these steps:
 ```
 cd stitch
-source venv/bin/activate
-python3.12 stitch/row_counts.py babel.sqlite
+venv/bin/python3 stitch/row_counts.py babel.sqlite
 ```
 
 # Local Babel Instructions (Easy Setup for Erica Remote Development)
