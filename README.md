@@ -29,17 +29,27 @@ local Babel sqlite database.
 - Linux or MacOS (this software was not tested on Windows); see "Systems on which this software has been tested"
 
 # Systems on which this software has been tested
-The Stitch `ingest_babel.py` code has only been tested in two compute environments:
-## Ubuntu/Graviton
+The Stitch `ingest_babel.py` code has been tested in three compute environments:
+
+## Ubuntu/Xeon
+- We have tested a full run of `ingest_babel.py` on this system ([release `babel-sqlite-20250331`](https://github.com/Translator-CATRAX/stitch/releases/tag/babel-20250331)).
+- Ubuntu 24.04
+- `i4i.2xlarge` instance (Intel Xeon 8375C processor, which is x86_64 architecture), 64 GiB of memory
+- `gp3` root volume (500 GiB)
+- `Nitro SSD` volume (1.7 TiB)
+
+## Ubuntu/Graviton 
+- We have tested a full run of `ingest_babel.py` on this system ([release `babel-sqlite-20250123`](https://github.com/Translator-CATRAX/stitch/releases/tag/babel-20250123)).
 - Ubuntu 24.04
 - `c7g.4xlarge` instance (Graviton3 processor, which is ARM64 architecture), 32 GiB of memory
 - `gp3` root volume (800 GiB)
-- The following packages need to be `apt` installed: `sqlite3`, `build-essential`, `gcc`, `g++`, `make`, `libffi-dev`, `libssl-dev`, `zlib1g-dev`, `libbz2-dev`, `libreadline-dev`, `libsqlite3-dev`, `libncursesw5-dev`, `tk-dev`, `libgdbm-dev`, `libnss3-dev`, `liblzma-dev`, `uuid-dev`, `python3-dev`, `gfortran`, `libopenblas-dev`, `liblapack-dev`, `libfreetype6-dev`, `libpng-dev`, `libjpeg-dev`, `libtiff-dev`, `libffi-dev`, `liblzma-dev`, `pkg-config`, `cmake`, `python3.12-venv`
 - CPython, Numpy, and Pandas need to be compiled locally using gcc/g++ with the following CFLAGS:
 ```-mcpu=neoverse-v1 -mtune=neoverse-v1 -march=armv8.4-a+crypto -O3 -pipe```
+- To enable local compilation of CPython, Numpy, and Pandas, the following packages were `apt` installed: `sqlite3`, `build-essential`, `gcc`, `g++`, `make`, `libffi-dev`, `libssl-dev`, `zlib1g-dev`, `libbz2-dev`, `libreadline-dev`, `libsqlite3-dev`, `libncursesw5-dev`, `tk-dev`, `libgdbm-dev`, `libnss3-dev`, `liblzma-dev`, `uuid-dev`, `python3-dev`, `gfortran`, `libopenblas-dev`, `liblapack-dev`, `libfreetype6-dev`, `libpng-dev`, `libjpeg-dev`, `libtiff-dev`, `libffi-dev`, `liblzma-dev`, `pkg-config`, `cmake`, `python3.12-venv`.
 
 ## MacOS/Apple Silicon
-For reasons I don't fully understand, `ingest_babel.py` runs quite fast on the M1 Max, compared to
+- We have tested only _partial_ ingests of Babel on this system type. For reasons 
+I don't fully understand, `ingest_babel.py` runs quite fast on the M1 Max, compared to
 the Graviton3 processor. I've tested on the following MacOS system:
 - MacOS 14.6.1
 - Apple M1 Max processor, 64 GiB of memory
