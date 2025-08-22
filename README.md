@@ -74,13 +74,13 @@ the full set of dependencies.
 # Setup of a python virtualenv for using the `stich` software
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
 - `git clone https://github.com/Translator-CATRAX/stitch.git`
-- `cd stitch`
+- `cd stitch` (this is the directory that contains `requirements.txt`)
 - `python3.12 -m venv venv`
 - `venv/bin/pip3 install -r requirements.txt`
 
 # How to run the `stich` Babel sqlite ingest in AWS
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
-- `cd stitch`
+- `cd stitch` (this is the directory that contains `run-ingest-aws.sh`)
 - `screen` (to enter a screen session)
 - `./instance-memory-tracker.sh`
 - `ctrl-X D` (to exit the screen session)
