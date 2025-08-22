@@ -93,11 +93,6 @@ After approximately 28 hours, the ingest script should save the database as a fi
 `/home/ubuntu/stitch/babel.sqlite`; as of the March 31, 2025 release of Babel, the
 `babel.sqlite` file produced by the `ingest_babel.py` script is 172 GiB.
 
-Note, the `ingest_babel.py` script does not ingest the Babel `conflation` files
-`DrugChemical.txt` and `GeneProtein.txt`; the plan is to ingest these as "edges"
-in the big KG, rather than to conflate gene/protein concept nodes and conflate
-chemical/drug concept nodes.
-
 # Downloading a pre-built Babel sqlite database file
 [`babel-20250331.sqlite`](https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250331.sqlite)
 (173 GiB) is available for download from AWS S3.  For details and an MD5
