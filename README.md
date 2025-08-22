@@ -22,11 +22,12 @@ local Babel sqlite database.
 - `row_counts.py`: a script that prints out the row counts of the tables in the local Babel sqlite database
 
 # Requirements
-- CPython 3.12, which needs to be available in your path as `python3.12`
+- CPython 3.12, which needs to be available in your path as `python3.12`, with the `venv` module installed
 - At least 32 GiB of system memory
 - To build `babel.sqlite`, at least 600 GiB of free file system storage space (usage transiently spikes to ~522 GiB and then the final database size is ~172 GiB).
 - To use a local `babel.sqlite` in your application, 200 GiB of free system storage space to store the sqlite file.
-- Linux or MacOS (this software was not tested on Windows); see "Systems on which this software has been tested"
+- Linux or MacOS (this software has not been tested on Windows; see "Systems on which this software has been tested").
+- If you want to download the pre-built Babel sqlite database file, you will need to have `curl` or `wget` installed.
 
 # Systems on which this software has been tested
 The Stitch `ingest_babel.py` code has been tested in three compute environments:
@@ -151,6 +152,20 @@ The analysis should take less than an hour.
 
 # How to use the local Babel sqlite database
 For now, see the module `tests/test_local_babel.py` for examples.
+
+# Setting up local Babel sqlite database so you can run the unit tests:
+First, download `babel-20250331.sqlite` from S3 as described above, 
+and ensure that in the top-level `stitch` directory (i.e., the directory where
+`run-checks.sh` resides), there is a symbolic link `db` or a subdirectory `db`
+such that if the current working directory is the top-level `stitch` directory,
+the relative path `db/babel-2025331.sqlite` can open the database file. 
+Something like this should do it:
+```
+cd stitch
+mkdir -p db
+curl -s -L https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250331.sqlite > \
+    db/babel-20250331.sqlite
+```
 
 # Running the type checks, lint checks, dead code checks, and unit tests:
 These checks should be run before any commit:
