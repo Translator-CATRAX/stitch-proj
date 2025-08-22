@@ -4,6 +4,7 @@
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+*.sqlite-journal
 *.pstats
 **/__pycache__/*
 test/*
