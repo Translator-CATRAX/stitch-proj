@@ -188,6 +188,7 @@ cd stitch
 venv/bin/pytest -v
 ```
 # How to run the integration tests of ingest_babel.py
+Running all three integration tests may take up to an hour:
 ```
 cd stitch
 ./run-integration-tests.sh
