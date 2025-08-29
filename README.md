@@ -104,7 +104,11 @@ directory is. You will need this in order for the unit test module
 
 After approximately 28 hours, the ingest script should save the database as a file
 `/home/ubuntu/stitch-proj/babel.sqlite`; as of the March 31, 2025 release of Babel, the
-`babel.sqlite` file produced by the `ingest_babel.py` script is 172 GiB.
+`babel.sqlite` file produced by the `ingest_babel.py` script is 172 GiB. The
+`ingest_babel.py` script (internally) turns off buffering for the `stdout`
+and `stderr` streams, so that output logging information is seen immediately
+in the logfile as soon as an update is "printed" by the python script.
+This behavior cannot be overridden at the `python3.12` command-line.
 
 # What if you don't want to use `run-ingest-aws.sh`, for ingesting Babel?
 If you prefer to run `ingest_babel.py` by invoking it directly from the
