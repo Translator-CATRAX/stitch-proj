@@ -107,10 +107,11 @@ After approximately 28 hours, the ingest script should save the database as a fi
 `babel.sqlite` file produced by the `ingest_babel.py` script is 172 GiB.
 
 # What if you don't want to use `run-ingest-aws.sh`, for ingesting Babel?
-If you decide to run `ingest_babel.py` by invoking it directly from the
-command-line (rather than by using the `run-ingest-aws.sh` script), you can do
-that. After setting up your virtualenv and installing stitch using n `pip3
-install -e .` as shown above, you can run
+If you prefer to run `ingest_babel.py` by invoking it directly from the
+command-line (rather than by using the `run-ingest-aws.sh` script), that
+can be done using the `ingest-babel` script that is set up in your virtualenv. 
+After setting up your virtualenv and installing `stitch-proj` using the `pip3
+install -e .` command as shown above, you can run
 ```
 venv/bin/ingest-babel COMMAND_LINE_ARGS
 ```
@@ -209,6 +210,17 @@ cd stitch-proj
 ```
 which will run type checks (using `mypy`), lint checks (using `ruff`),
 dead code tests (using `vulture`), and unit tests (using `pytest`).
+Note that some of the unit tests require Internet connectivity; if
+you do not have a working Internet connection, and if you run the unit
+tests, you will see a runtime error like this:
+```
+E               urllib.error.URLError: <urlopen error [Errno 8] nodename nor servname provided, or not known>
+
+/opt/homebrew/Cellar/python@3.12/3.12.7_1/Frameworks/Python.framework/Versions/3.12/lib/python3.12/urllib/request.py:1347: URLError
+=========================================== short test summary info ============================================
+FAILED tests/test_stitchutils.py::test_get_biolink_categories - urllib.error.URLError: <urlopen error [Errno 8] nodename nor servname provided, or not known>
+========================================= 1 failed, 17 passed in 1.96s =========================================
+```
 
 # How to run just the unit test suite
 First, you need to make sure that underneath the top-level
@@ -220,23 +232,27 @@ Then you can run the unit test suite, like this:
 cd stitch-proj
 venv/bin/pytest -v
 ```
-You should _not_ try to run the unit tests like this:
+Note that you should _not_ try to run the unit tests like this:
 ```
 cd stitch-proj/tests
 ../venv/bin/pytest -v
 ```
 because if you do it that way, the `test_local_babel.py` module
-won't be able to find the sqlite database that it depends on.
+won't be able to find the sqlite database that it depends on, and
+you will get a large number of errors from that unit test module.
 
-# How to run the integration tests of ingest_babel.py
-Running all three integration tests may take up to an hour:
+# How to run the integration tests of `ingest_babel.py`
+Running all three integration tests of `ingest_babel.py` 
+may take up to an hour (and will require a fast Internet connection, 
+since the integration tests ingest various Babel compendia and
+conflation files, which they load remotely via HTTPS). To run the
+tests:
 ```
 cd stitch-proj
 ./run-integration-tests.sh
 ```
 
 # How to regenerate the schema diagram
-
 Use the `ingest_babel.py` script to generate the `ddl.sql` file as follows: 
 ```
 cd stitch-proj
@@ -250,7 +266,6 @@ pane, click on the "References" tab. Use macOS system screen-capture tool to
 obtain a PNG of the schema diagram.
 
 # To print out the table row counts:
-
 Run these steps:
 ```
 cd stitch-proj
