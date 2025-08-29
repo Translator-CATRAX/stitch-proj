@@ -880,18 +880,18 @@ def _make_get_make_chunkproc_args_compendia(insrt_missing_taxa: bool) -> \
                              insrt_missing_taxa)
 
 # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
-def _main(babel_compendia_url: str,
-          babel_conflation_url: str,
-          database_file_name: str,
-          lines_per_chunk: int,
-          use_existing_db: bool,
-          test_type: Optional[int],
-          test_compendia_file: Optional[str],
-          quiet: bool,
-          dry_run: bool,
-          print_ddl: bool,
-          temp_dir: str,
-          no_exec: bool):
+def _main_args(babel_compendia_url: str,
+               babel_conflation_url: str,
+               database_file_name: str,
+               lines_per_chunk: int,
+               use_existing_db: bool,
+               test_type: Optional[int],
+               test_compendia_file: Optional[str],
+               quiet: bool,
+               dry_run: bool,
+               print_ddl: bool,
+               temp_dir: str,
+               no_exec: bool):
     log_work = not quiet
     # handle redefining _log_print first, in case any other function uses it
     _set_log_print_enabled(log_work)
@@ -987,8 +987,7 @@ def _main(babel_compendia_url: str,
                           "must be one of 1, 2, 3, or None"
         _do_final_cleanup(conn, log_work, glbl_chnk_cnt, start_time_sec)
 
-def _ext_main():
-    _main(**su.namespace_to_dict(_get_args()))
-    
-if __name__ == "__main__":
-    _ext_main()
+def _main():
+    sys.stdout.reconfigure(line_buffering=True)
+    sys.stderr.reconfigure(line_buffering=True)
+    _main_args(**su.namespace_to_dict(_get_args()))
