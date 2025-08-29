@@ -77,6 +77,12 @@ the full set of dependencies.
 - `cd stitch` (this is the directory that contains `requirements.txt`)
 - `python3.12 -m venv venv`
 - `venv/bin/pip3 install -r requirements.txt`
+- `venv/bin/pip3 install -e .`
+The last step above (i.e., the `pip3 install -e .` step) sets up some symbolic
+links within your virtualenv, so that `stitchutils` can be imported
+without manipulating the PYTHONPATH, no matter what the current working
+directory is. You will need this in order for the unit test module
+`tests/test_ingest_babel.py` to run successfully.
 
 # How to run the `stich` Babel sqlite ingest in AWS
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
@@ -155,7 +161,7 @@ First, download `babel-20250331.sqlite` from S3 as described above,
 and ensure that in the top-level `stitch` directory (i.e., the directory where
 `run-checks.sh` resides), there is a symbolic link `db` or a subdirectory `db`
 such that if the current working directory is the top-level `stitch` directory,
-the relative path `db/babel-2025331.sqlite` can open the database file. 
+the relative path `db/babel-2025331.sqlite` can open the database file.
 Something like this should do it:
 ```
 cd stitch
@@ -183,6 +189,14 @@ Then you can run the unit test suite, like this:
 cd stitch
 venv/bin/pytest -v
 ```
+You should _not_ try to run the unit tests like this:
+```
+cd stitch/tests
+../venv/bin/pytest -v
+```
+because if you do it that way, the `test_local_babel.py` module
+won't be able to find the sqlite database that it depends on.
+
 # How to run the integration tests of ingest_babel.py
 Running all three integration tests may take up to an hour:
 ```
