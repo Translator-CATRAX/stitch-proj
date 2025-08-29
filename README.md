@@ -72,12 +72,16 @@ database from scratch, the PyPI packages `pandas`, `ray`, `swifter`, and
 the full set of dependencies.
 
 # Setup of a python virtualenv for using the `stich` software
+You can just run
+```
+cd stitch
+./run-setup-venv.sh
+```
+Or if you are using AWS,
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
 - `git clone https://github.com/Translator-CATRAX/stitch.git`
 - `cd stitch` (this is the directory that contains `requirements.txt`)
-- `python3.12 -m venv venv`
-- `venv/bin/pip3 install -r requirements.txt`
-- `venv/bin/pip3 install -e .`
+- `./run-setup-venv.sh`
 The last step above (i.e., the `pip3 install -e .` step) sets up some symbolic
 links within your virtualenv, so that `stitchutils` can be imported
 without manipulating the PYTHONPATH, no matter what the current working
