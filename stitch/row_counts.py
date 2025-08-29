@@ -34,8 +34,8 @@ import argparse
 import pprint
 import sqlite3
 
-import local_babel
-import stitchutils as su
+from stitch import local_babel
+from stitch import stitchutils as su
 
 
 def _get_args() -> argparse.Namespace:
