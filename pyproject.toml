@@ -21,4 +21,4 @@ where = ["."]
 include = ["stitch*"]
 
 [project.scripts]
-stitch-ingest = "stitch.ingest_babel:main"
+stitch-ingest = "stitch.ingest_babel:_main"
