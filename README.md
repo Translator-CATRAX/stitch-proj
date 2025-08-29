@@ -107,22 +107,29 @@ After approximately 28 hours, the ingest script should save the database as a fi
 `babel.sqlite` file produced by the `ingest_babel.py` script is 172 GiB.
 
 # What if you don't want to use `run-ingest-aws.sh`, for ingesting Babel?
-If you decide to run `ingest_babel.py` by invoking it directly from
-the command-line (rather than by using the `run-ingest-aws.sh` script), you will
-want to ensure that whatever location you specify (or, alternatively, the
-default location you opt to leave in place) for the `ingest_babel.py` temporary
-file directory will have at least 600 GiB of free space available (although upon
-script completion, `ingest_babel.py` will not need any temp directory space). In
-most cases, the easiest way to ensure this is to specify, in calling
-`ingest_babel.py`, the location that you choose for a temporary file directory
-using the `--temp-dir` command-line option, and further, to specify a temporary
-file directory location that is _in the same filesystem_ as the location where
-you are configuring `ingest_babel.py` to output the Babel sqlite file. This way,
-the space on the filesystem is "shared" between the temp directory and the final
-output database. The `run-ingest-aws.sh` script takes care of this, in an
-idempotent way, by creating a local temp dir and then configuring
-`ingest_babel.py` to use that temp dir (and ensuring that the final output Babel
-sqlite file goes into the same filesystem).
+If you decide to run `ingest_babel.py` by invoking it directly from the
+command-line (rather than by using the `run-ingest-aws.sh` script), you can do
+that. After setting up your virtualenv and installing stitch using n `pip3
+install -e .` as shown above, you can run
+```
+venv/bin/ingest-babel COMMAND_LINE_ARGS
+```
+where `COMMAND_LINE_ARGS` represents the various command-line arguments you wish
+to pass to the Babel ingest script, `ingest_babel.py`.  Note, if you do this,
+you will want to ensure that whatever location you specify (or, alternatively,
+the default location you opt to leave in place) for the `ingest_babel.py`
+temporary file directory will have at least 600 GiB of free space available
+(although upon script completion, `ingest_babel.py` will not need any temp
+directory space). In most cases, the easiest way to ensure this is to specify,
+in calling `ingest_babel.py`, the location that you choose for a temporary file
+directory using the `--temp-dir` command-line option, and further, to specify a
+temporary file directory location that is _in the same filesystem_ as the
+location where you are configuring `ingest_babel.py` to output the Babel sqlite
+file. This way, the space on the filesystem is "shared" between the temp
+directory and the final output database. The `run-ingest-aws.sh` script takes
+care of this, in an idempotent way, by creating a local temp dir and then
+configuring `ingest_babel.py` to use that temp dir (and ensuring that the final
+output Babel sqlite file goes into the same filesystem).
 
 # Downloading a pre-built Babel sqlite database file
 [`babel-20250331.sqlite`](https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250331.sqlite)
