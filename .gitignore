@@ -13,3 +13,4 @@ venv/*
 old/*
 db
 build-*/*
+stitch_proj.egg-info/*
