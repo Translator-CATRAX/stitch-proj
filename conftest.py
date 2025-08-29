@@ -3,7 +3,8 @@ Pytest configuration for the test suite.
 
 This conftest.py file sets the multiprocessing start method to
 "spawn" (or "forkserver") for all tests, ensuring compatibility
-across different platforms (Linux, macOS, Windows). The fixture
+across different platforms (i.e., Linux and macOS; Windows is
+not supported in the `stitch-proj` project). The fixture
 is session-scoped and autouse, so it is applied automatically.
 """
 import multiprocessing as mp
