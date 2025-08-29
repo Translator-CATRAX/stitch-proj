@@ -22,10 +22,11 @@ local Babel sqlite database.
 - `row_counts.py`: a script that prints out the row counts of the tables in the local Babel sqlite database
 
 # Requirements
-- CPython 3.12, which needs to be available in your path as `python3.12`, with the `venv` module installed
+- CPython 3.12, which needs to be available in your path as `python3.12`, with the `venv` library installed and in the python path
 - At least 32 GiB of system memory
-- To build `babel.sqlite`, at least 600 GiB of free file system storage space (usage transiently spikes to ~522 GiB and then the final database size is ~172 GiB).
-- To use a local `babel.sqlite` in your application, 200 GiB of free system storage space to store the sqlite file.
+- Sufficient disk space in wherever filesystem hosts your `stitch-proj` directory, which will depend on your use-case:
+  - To build `babel.sqlite`, at least 600 GiB of free file system storage space (usage transiently spikes to ~522 GiB and then the final database size is ~172 GiB).
+  - To use a local `babel.sqlite` in your application, 200 GiB of free system storage space to store the sqlite file.
 - Linux or MacOS (this software has not been tested on Windows; see "Systems on which this software has been tested").
 - If you want to download the pre-built Babel sqlite database file, you will need to have `curl` or `wget` installed.
 - Optionally, you can install `sqlite3_analyzer`, if you want to obtain detailed database statistics (see instructions below in this page).
@@ -105,6 +106,24 @@ After approximately 28 hours, the ingest script should save the database as a fi
 `/home/ubuntu/stitch-proj/babel.sqlite`; as of the March 31, 2025 release of Babel, the
 `babel.sqlite` file produced by the `ingest_babel.py` script is 172 GiB.
 
+# What if you don't want to use `run-ingest-aws.sh`, for ingesting Babel?
+If you decide to run `ingest_babel.py` by invoking it directly from
+the command-line (rather than by using the `run-ingest-aws.sh` script), you will
+want to ensure that whatever location you specify (or, alternatively, the
+default location you opt to leave in place) for the `ingest_babel.py` temporary
+file directory will have at least 600 GiB of free space available (although upon
+script completion, `ingest_babel.py` will not need any temp directory space). In
+most cases, the easiest way to ensure this is to specify, in calling
+`ingest_babel.py`, the location that you choose for a temporary file directory
+using the `--temp-dir` command-line option, and further, to specify a temporary
+file directory location that is _in the same filesystem_ as the location where
+you are configuring `ingest_babel.py` to output the Babel sqlite file. This way,
+the space on the filesystem is "shared" between the temp directory and the final
+output database. The `run-ingest-aws.sh` script takes care of this, in an
+idempotent way, by creating a local temp dir and then configuring
+`ingest_babel.py` to use that temp dir (and ensuring that the final output Babel
+sqlite file goes into the same filesystem).
+
 # Downloading a pre-built Babel sqlite database file
 [`babel-20250331.sqlite`](https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250331.sqlite)
 (173 GiB) is available for download from AWS S3.  For details and an MD5
@@ -139,6 +158,7 @@ from the [sqlite software project area on GitHub](https://github.com/sqlite/sqli
 On Ubuntu, you can just perform the following steps to have
 `sqlite3_analyzer` available in `/usr/local/bin`:
 ```
+cd stitch-prod
 git clone https://github.com/sqlite/sqlite.git
 cd sqlite
 ./configure --prefix=/usr/local
@@ -212,6 +232,7 @@ cd stitch-proj
 
 Use the `ingest_babel.py` script to generate the `ddl.sql` file as follows: 
 ```
+cd stitch-proj
 venv/bin/python3 stitch/ingest_babel.sql --print-ddl --dry-run 2>ddl.sql 
 ``` 
 On macOS, run the DbVisualizer application (free version
