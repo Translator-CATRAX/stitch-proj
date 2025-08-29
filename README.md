@@ -1,4 +1,4 @@
-# stitch
+# stitch-proj
 Some tools for building a Translator BigKG. This software project is experimental and unfinished.
 
 # Introduction 
@@ -31,17 +31,17 @@ local Babel sqlite database.
 - Optionally, you can install `sqlite3_analyzer`, if you want to obtain detailed database statistics (see instructions below in this page).
 
 # Systems on which this software has been tested
-The Stitch `ingest_babel.py` code has been tested in three compute environments:
+The `stitch-proj` project's module `ingest_babel.py` has been tested in three compute environments:
 
 ## Ubuntu/Xeon
-- We have tested a full run of `ingest_babel.py` on this system ([release `babel-sqlite-20250331`](https://github.com/Translator-CATRAX/stitch/releases/tag/babel-20250331)). This instance has instance name `stitch2.rtx.ai` and is in the `us-west-1` AWS region.
+- We have tested a full run of `ingest_babel.py` on this system ([release `babel-sqlite-20250331`](https://github.com/Translator-CATRAX/stitch-proj/releases/tag/babel-20250331)). This instance has instance name `stitch2.rtx.ai` and is in the `us-west-1` AWS region.
 - Ubuntu 24.04
 - `i4i.2xlarge` instance (Intel Xeon 8375C processor, which is x86_64 architecture), 64 GiB of memory
 - `gp3` root volume (500 GiB)
 - `Nitro SSD` volume (1.7 TiB)
 
 ## Ubuntu/Graviton 
-- We have tested a full run of `ingest_babel.py` on this system ([release `babel-sqlite-20250123`](https://github.com/Translator-CATRAX/stitch/releases/tag/babel-20250123)).
+- We have tested a full run of `ingest_babel.py` on this system ([release `babel-sqlite-20250123`](https://github.com/Translator-CATRAX/stitch-proj/releases/tag/babel-20250123)).
 - Ubuntu 24.04
 - `c7g.4xlarge` instance (Graviton3 processor, which is ARM64 architecture), 32 GiB of memory
 - `gp3` root volume (800 GiB)
@@ -60,27 +60,28 @@ the Graviton3 processor. I've tested on the following MacOS system:
 - `openblas` installed via Homebrew
 
 # Python distribution package requirements 
-All external PyPI distribution package requirements for Stitch are listed in the
-[`requirements.txt`](https://github.com/Translator-CATRAX/stitch/blob/main/requirements.txt) file.  Stitch's `run-checks.sh` script (see section "Running
+All external PyPI distribution package requirements for the `stitch-proj` project are listed in the
+[`requirements.txt`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/requirements.txt) file.  
+The `run-checks.sh` script (see section "Running
 the type checks, lint checks, ..." below) depends on the packages `pytest`,
-`ruff`, and `vulture`.  For a "querying" type user that is just using
+`ruff`, `vulture`, and `pylint`.  For a "querying" type user that is just using
 `local_babel.py`, only three PyPI distribution packages are needed, `requests`,
 `numpy`, and the Biolink Model Toolkit (`bmt`). Additionally, for an "ingester"
 type user who wants to run `ingest_babel.py` to build a local Babel sqlite
-database from scratch, the PyPI packages `pandas`, `ray`, `swifter`, and
-`htmllistparse` are needed. The stitch `requirements.txt` file contains
+database from scratch, the PyPI packages `pandas`, `ray`, and
+`htmllistparse` are needed. The `requirements.txt` file contains
 the full set of dependencies.
 
 # Setup of a python virtualenv for using the `stich` software
 You can just run
 ```
-cd stitch
+cd stitch-proj
 ./run-setup-venv.sh
 ```
 Or if you are using AWS,
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
-- `git clone https://github.com/Translator-CATRAX/stitch.git`
-- `cd stitch` (this is the directory that contains `requirements.txt`)
+- `git clone https://github.com/Translator-CATRAX/stitch-proj.git`
+- `cd stitch-proj` (this is the directory that contains `requirements.txt`)
 - `./run-setup-venv.sh`
 The last step above (i.e., the `pip3 install -e .` step) sets up some symbolic
 links within your virtualenv, so that `stitchutils` can be imported
@@ -88,9 +89,9 @@ without manipulating the PYTHONPATH, no matter what the current working
 directory is. You will need this in order for the unit test module
 `tests/test_ingest_babel.py` to run successfully.
 
-# How to run the `stich` Babel sqlite ingest in AWS
+# How to run the `stich-proj` Babel sqlite ingest in AWS
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
-- `cd stitch` (this is the directory that contains `run-ingest-aws.sh`)
+- `cd stitch-proj`
 - `screen` (to enter a screen session)
 - `./instance-memory-tracker.sh`
 - `ctrl-X D` (to exit the screen session)
@@ -101,17 +102,17 @@ directory is. You will need this in order for the unit test module
 - In another terminal session, watch memory usage using `top`
 
 After approximately 28 hours, the ingest script should save the database as a file
-`/home/ubuntu/stitch/babel.sqlite`; as of the March 31, 2025 release of Babel, the
+`/home/ubuntu/stitch-proj/babel.sqlite`; as of the March 31, 2025 release of Babel, the
 `babel.sqlite` file produced by the `ingest_babel.py` script is 172 GiB.
 
 # Downloading a pre-built Babel sqlite database file
 [`babel-20250331.sqlite`](https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250331.sqlite)
 (173 GiB) is available for download from AWS S3.  For details and an MD5
 checksum hash, see the (Releases
-page)[https://github.com/Translator-CATRAX/stitch/releases] for the stich
+page)[https://github.com/Translator-CATRAX/stitch-proj/releases] for the stich
 project. You will need to download (or, alternatively, build from scratch using
 `ingest_babel.py`) this file in order to be able to run the unit test 
-suite for the "stitch" software.
+suite.
 
 # The local Babel sqlite database schema
 This schema diagram was generated using [DbVisualizer](https://www.dbvis.com) Free version 24.3.3.
@@ -130,7 +131,7 @@ is not unique; there can be more than one clique with the same
 `primary_identifier_id` and different `type_id` values.  In theory, I should
 probably add a two-column uniqueness constraint to the `cliques` table, but I
 have not yet done so.  See issue 16:
-https://github.com/Translator-CATRAX/stitch/issues/16
+https://github.com/Translator-CATRAX/stitch-proj/issues/16
 
 # Analyzing the local Babel sqlite database
 Consider installing and compiling `sqlite3_analyzer`, which is available
@@ -162,13 +163,12 @@ For now, see the module `tests/test_local_babel.py` for examples.
 
 # Setting up local Babel sqlite database so you can run the unit tests:
 First, download `babel-20250331.sqlite` from S3 as described above, 
-and ensure that in the top-level `stitch` directory (i.e., the directory where
-`run-checks.sh` resides), there is a symbolic link `db` or a subdirectory `db`
-such that if the current working directory is the top-level `stitch` directory,
+and ensure that in the top-level `stitch-proj` directory, there is a symbolic link `db` or a subdirectory `db`
+such that if the current working directory is the top-level `stitch-proj` directory,
 the relative path `db/babel-2025331.sqlite` can open the database file.
 Something like this should do it:
 ```
-cd stitch
+cd stitch-proj
 mkdir -p db
 curl -s -L https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250331.sqlite > \
     db/babel-20250331.sqlite
@@ -177,7 +177,7 @@ curl -s -L https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250331.sqli
 # Running the type checks, lint checks, dead code checks, and unit tests:
 These checks should be run before any commit:
 ```
-cd stitch
+cd stitch-proj
 ./run-checks.sh
 ```
 which will run type checks (using `mypy`), lint checks (using `ruff`),
@@ -190,12 +190,12 @@ the `babel-20250331.sqlite` file (see section
 "Downloading a pre-built Babel sqlite database file").
 Then you can run the unit test suite, like this:
 ```
-cd stitch
+cd stitch-proj
 venv/bin/pytest -v
 ```
 You should _not_ try to run the unit tests like this:
 ```
-cd stitch/tests
+cd stitch-proj/tests
 ../venv/bin/pytest -v
 ```
 because if you do it that way, the `test_local_babel.py` module
@@ -204,7 +204,7 @@ won't be able to find the sqlite database that it depends on.
 # How to run the integration tests of ingest_babel.py
 Running all three integration tests may take up to an hour:
 ```
-cd stitch
+cd stitch-proj
 ./run-integration-tests.sh
 ```
 
@@ -225,14 +225,14 @@ obtain a PNG of the schema diagram.
 
 Run these steps:
 ```
-cd stitch
+cd stitch-proj
 venv/bin/python3 stitch/row_counts.py babel.sqlite
 ```
 
 # Special instructions for running `ingest_babel.py` in an `i4i.2xlarge` instance
 The first time you start the instance:
 ```
-ln -s /mnt/localssd /home/ubuntu/stitch
+ln -s /mnt/localssd /home/ubuntu/stitch-proj
 ```
 Then, every time you start the instance:
 ```
