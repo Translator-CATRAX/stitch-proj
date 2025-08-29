@@ -92,6 +92,7 @@ import numpy
 import pandas as pd
 import ray
 from htmllistparse.htmllistparse import FileEntry, fetch_listing
+
 from stitch import stitchutils as su
 
 ChunkType = pd.DataFrame | list[str]
