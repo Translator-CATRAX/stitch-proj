@@ -182,11 +182,11 @@ The analysis should take less than an hour.
 For now, see the module `tests/test_local_babel.py` for examples.
 
 # Setting up local Babel sqlite database so you can run the unit tests:
-First, download `babel-20250331.sqlite` from S3 as described above, 
-and ensure that in the top-level `stitch-proj` directory, there is a symbolic link `db` or a subdirectory `db`
-such that if the current working directory is the top-level `stitch-proj` directory,
-the relative path `db/babel-2025331.sqlite` can open the database file.
-Something like this should do it:
+First, download `babel-20250331.sqlite` from S3 as described above, and ensure
+that in the top-level `stitch-proj` directory, there is a symbolic link `db` or
+a subdirectory `db` such that if the current working directory is the top-level
+`stitch-proj` directory, the relative path `db/babel-2025331.sqlite` can open
+the database file.  Something like this should do it:
 ```
 cd stitch-proj
 mkdir -p db
