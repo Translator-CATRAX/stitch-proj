@@ -987,5 +987,8 @@ def _main(babel_compendia_url: str,
                           "must be one of 1, 2, 3, or None"
         _do_final_cleanup(conn, log_work, glbl_chnk_cnt, start_time_sec)
 
-if __name__ == "__main__":
+def _ext_main():
     _main(**su.namespace_to_dict(_get_args()))
+    
+if __name__ == "__main__":
+    _ext_main()
