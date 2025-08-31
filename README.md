@@ -277,22 +277,25 @@ venv/bin/python3 stitch/row_counts.py babel.sqlite
 ```
 
 # Special instructions for running `ingest_babel.py` in an `i4i.2xlarge` instance
-The first time you start the instance:
-```
-ln -s /mnt/localssd /home/ubuntu/stitch-proj
-```
 Then, every time you start the instance:
 ```
 sudo mkdir -p /mnt/localssd
 sudo lsblk
 ```
 The last command (`sudo lsblk`) should provide the name of the 1.7 TiB local SSD device,
-like `/dev/nvme1n1`. Use that in place of "`/dev/nvme1n1`" below.
+like `/dev/nvme1n1`. Use that in place of "`/dev/nvme1n1`" below. Continuing with the commands
+that you should perform every time you start the instance:
 ```
 sudo mkfs.ext4 /dev/nvme1n1
 sudo mount /dev/nvme1n1 /mnt/localssd
 sudo chown ubuntu:ubuntu /mnt/localssd
+mkdir -p /mnt/localssd/stitch-proj
 ```
+And if it is the first time you are setting up the instance, you should do this step:
+```
+ln -s /mnt/localssd/stitch-proj /home/ubuntu/stitch-proj
+```
+(but that symbolic link will persist even when you stop and then start the instance).
 
 # How to cite Babel in a publication
 Please see the [Babel `CITATION.cff` file](https://github.com/TranslatorSRI/Babel/blob/master/CITATION.cff).
