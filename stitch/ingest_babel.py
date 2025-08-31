@@ -97,7 +97,7 @@ from stitch import stitchutils as su
 
 ChunkType = pd.DataFrame | list[str]
 
-DEFAULT_BABEL_RELEASE_URL =  'https://stars.renci.org/var/babel_outputs/2025mar31/'
+DEFAULT_BABEL_RELEASE_URL =  'https://stars.renci.org/var/babel_outputs/2025aug17/'
 DEFAULT_BABEL_COMPENDIA_URL = urljoin(DEFAULT_BABEL_RELEASE_URL, 'compendia/')
 DEFAULT_BABEL_CONFLATION_URL = urljoin(DEFAULT_BABEL_RELEASE_URL, 'conflation/')
 DEFAULT_DATABASE_FILE_NAME = 'babel.sqlite'
