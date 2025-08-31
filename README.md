@@ -291,6 +291,7 @@ like `/dev/nvme1n1`. Use that in place of "`/dev/nvme1n1`" below.
 ```
 sudo mkfs.ext4 /dev/nvme1n1
 sudo mount /dev/nvme1n1 /mnt/localssd
+sudo chown ubuntu:ubuntu /mnt/localssd
 ```
 
 # How to cite Babel in a publication
