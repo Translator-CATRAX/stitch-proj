@@ -595,13 +595,22 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                                      in zip(tuple(curies_to_pkids[primary_id]
                                                   for primary_id in primary_curies),
                                             data_to_insert_cliques)))
-        cursor.executemany('INSERT INTO identifiers_cliques '
-                           '(identifier_id, clique_id) '
-                           'VALUES (?, ?);',
-                           tuple((row_pkid,
-                                  int(chunk['clique_pkid'].tolist()[chunk_row]))
-                                 for _, _, _, _, chunk_row, row_pkid
-                                 in curies_df.itertuples(index=False)))
+
+        # precompute once; no Python lists in the hot loop
+        clique_arr = chunk['clique_pkid'].to_numpy(copy=False)
+
+        # iterate only the columns you need, as bare tuples
+        rows = curies_df[['chunk_row', 'row_pkid']].itertuples(index=False, name=None)
+
+        # stream an iterator to executemany; avoid tuple(...) materialization
+        cursor.executemany(
+            'INSERT INTO identifiers_cliques (identifier_id, clique_id) VALUES (?, ?);',
+            ((row_pkid, int(clique_arr[chunk_row]))
+             # int() if sqlite doesn't like numpy scalars
+             for chunk_row, row_pkid in rows)
+        )
+
+        clique_info_list = chunk.identifiers.tolist()
         cursor.executemany('INSERT INTO identifiers_descriptions '
                            '(description_id, identifier_id) '
                            'VALUES (?, ?);',
@@ -611,7 +620,7 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                                                         'RETURNING id;',
                                                         (description_str,)),
                                   curies_to_pkids[clique_identifier_info['i']])
-                                 for clique_info in chunk.identifiers.tolist()
+                                 for clique_info in clique_info_list
                                  for clique_identifier_info in clique_info
                                  for description_str
                                  in clique_identifier_info.get('d', [])))
