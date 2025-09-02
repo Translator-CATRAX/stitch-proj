@@ -91,9 +91,14 @@ from urllib.parse import urljoin
 import numpy
 import pandas as pd
 import ray
+import swifter  # noqa: F401  # pylint: disable=unused-import
 from htmllistparse.htmllistparse import FileEntry, fetch_listing
 
 from stitch import stitchutils as su
+
+# The "noqa: F401" for "import swifter" is needed because swifter is somehow
+# automagically used once you import it, but the "ruff" lint checker software
+# doesn't detect that use of the "swifter" module, so it flags an F401 error.
 
 ChunkType = pd.DataFrame | list[str]
 
@@ -104,7 +109,8 @@ DEFAULT_DATABASE_FILE_NAME = 'babel.sqlite'
 DEFAULT_TEST_TYPE = None
 DEFAULT_COMPENDIA_TEST_FILE = "test-tiny.jsonl"
 DEFAULT_LINES_PER_CHUNK = 100_000
-WAL_SIZE = 1000
+WAL_SIZE = 100_000
+CACHE_SIZE = -8_000_000
 UNKNOWN_TAXON = "unknown taxon"  # this is needed for certain built-in test cases
 
 def _get_args() -> argparse.Namespace:
@@ -210,18 +216,23 @@ def _create_index(table: str,
         print(statement, file=print_ddl_file_obj)
 
 def _do_index_analyze(conn: sqlite3.Connection,
-                      log_work: bool):
-    _log_print("starting database ANALYZE")
+                      log_work: bool,
+                      mandatory_analyze: bool = False):
+    if mandatory_analyze:
+        command_str = 'ANALYZE'
+    else:
+        command_str = 'PRAGMA optimize'
+    _log_print(f"running {command_str}")
     if log_work:
         analyze_start_time = time.time()
-    conn.execute("ANALYZE;")
-    _log_print("completed database ANALYZE")
+    conn.execute(command_str)
+    _log_print(f"completed {command_str}")
     if log_work:
         analyze_end_time = time.time()
         analyze_elapsed_time = \
             su.format_time_seconds_to_str(analyze_end_time -
                                           analyze_start_time)
-        _log_print(f"running ANALYZE took: {analyze_elapsed_time} "
+        _log_print(f"running {command_str} took: {analyze_elapsed_time} "
                    "(HHH:MM::SS)")
 
 def _set_auto_vacuum(conn: sqlite3.Connection,
@@ -376,7 +387,7 @@ def _get_database(database_file_name: str,
     conn = sqlite3.connect(database_file_name)
     _set_auto_vacuum(conn, False)
     _run_vacuum(conn)
-    _set_pragmas_for_ingestion(conn, WAL_SIZE)
+    _set_pragmas_for_ingestion(conn, WAL_SIZE, CACHE_SIZE)
     return conn
 
 def _first_label(group_df: pd.DataFrame) -> pd.Series:
@@ -550,6 +561,8 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                    (curies_df.loc[(curies_df
                                    .pkid
                                    .isna())][['curie', 'label']]
+                    .swifter
+                    .progress_bar(False)
                     .groupby(by='curie')
                     .apply(_first_label,
                            include_groups=False)
@@ -657,6 +670,7 @@ def _make_url_ingester(conn: sqlite3.Connection,
                 conn.execute("BEGIN TRANSACTION;")
                 if log_work and chunk_ctr == 1:
                     start_time = time.time()
+                chunk_start_time = time.time()
                 process_chunk(chunk)
                 conn.commit()
                 if log_work:
@@ -669,13 +683,12 @@ def _make_url_ingester(conn: sqlite3.Connection,
                     else:
                         num_chunks = None
                     assert start_time is not None # assigned on 1st iter
-                    _do_log_work((start_time,
-                                  start_time if chunk_ctr == 1 else time.time()),
+                    _do_log_work((start_time, chunk_start_time),
                                  (chunk_ctr, glbl_chnk_cnt),
                                  (num_chunks, total_size))
                 if any(chunk_ctr + glbl_chnk_cnt == chunks_per_analyze \
                        for chunks_per_analyze in chunks_per_analyze_list):
-                    _do_index_analyze(conn, log_work)
+                    _do_index_analyze(conn, log_work, False)
             except Exception as e:
                 conn.rollback()
                 raise e
@@ -752,14 +765,19 @@ def _get_conflation_files(conflation_files_index_url: str) ->\
     return tuple(conflation_sorted_files), conflation_map_names
 
 def _set_pragmas_for_ingestion(conn: sqlite3.Connection,
-                               wal_size: int):
-    for s in ('synchronous = OFF', 'journal_mode = WAL',
-              'optimize', f'wal_autocheckpoint = {wal_size}'):
+                               wal_size: int,
+                               cache_size: int):
+    for s in ('synchronous = OFF',
+              'journal_mode = WAL',
+              'temp_store = MEMORY',
+              f'cache_size = {cache_size}',
+              f'wal_autocheckpoint = {wal_size}'):
         conn.execute(f"PRAGMA {s}")
         _log_print(f"setting PRAGMA {s}")
 
 def _set_pragmas_for_querying(conn: sqlite3.Connection):
-    for s in ('wal_checkpoint(FULL)', 'journal_mode = DELETE'):
+    for s in ('wal_checkpoint(FULL)',
+              'journal_mode = DELETE'):
         conn.execute(f"PRAGMA {s}")
         _log_print(f"setting PRAGMA {s}")
     _set_auto_vacuum(conn, auto_vacuum_on=True)
@@ -772,7 +790,7 @@ def _do_integrity_check(conn: sqlite3.Connection):
 
 def _cleanup_indices(conn: sqlite3.Connection,
                      log_work: bool):
-    _do_index_analyze(conn, log_work)
+    _do_index_analyze(conn, log_work, True)
     _log_print("setting PRAGMA locking_mode to EXCLUSIVE")
     conn.execute("PRAGMA locking_mode=EXCLUSIVE")
     _run_vacuum(conn)
