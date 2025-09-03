@@ -91,14 +91,9 @@ from urllib.parse import urljoin
 import numpy
 import pandas as pd
 import ray
-import swifter  # noqa: F401  # pylint: disable=unused-import
 from htmllistparse.htmllistparse import FileEntry, fetch_listing
 
 from stitch import stitchutils as su
-
-# The "noqa: F401" for "import swifter" is needed because swifter is somehow
-# automagically used once you import it, but the "ruff" lint checker software
-# doesn't detect that use of the "swifter" module, so it flags an F401 error.
 
 ChunkType = pd.DataFrame | list[str]
 
@@ -561,8 +556,6 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                    (curies_df.loc[(curies_df
                                    .pkid
                                    .isna())][['curie', 'label']]
-                    .swifter
-                    .progress_bar(False)
                     .groupby(by='curie')
                     .apply(_first_label,
                            include_groups=False)
@@ -578,52 +571,37 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
             cursor.executemany('INSERT INTO identifiers_taxa '
                                '(identifier_id, taxa_identifier_id) '
                                'VALUES (?, ?);',
-                               tuple((curies_to_pkids[row_curie],
-                                      taxa_to_pkids[t])
+                               tuple((curies_to_pkids[row_curie], taxa_to_pkids[t])
                                      for row_curie, _, _, row_taxa, _, _
-                                     in curies_df.itertuples(index=False,
-                                                             name=None)
+                                     in curies_df.itertuples(index=False, name=None)
                                      for t in cast(list[str], row_taxa)))
         chunk['clique_pkid'] = \
             tuple(_insert_and_return_id(cursor,
-                                        'INSERT INTO cliques '
-                                        '(primary_identifier_id, ic, type_id, '
-                                        'preferred_name) '
+                                        'INSERT INTO cliques (primary_identifier_id, '
+                                        'ic, type_id, preferred_name) '
                                         'VALUES (?, ?, ?, ?) RETURNING id;',
                                         clique_data)
             for clique_data in tuple((pkid, *data) for pkid, data \
                                      in zip(tuple(curies_to_pkids[primary_id]
                                                   for primary_id in primary_curies),
                                             data_to_insert_cliques)))
-
-        # precompute once; no Python lists in the hot loop
         clique_arr = chunk['clique_pkid'].to_numpy(copy=False)
-
-        # iterate only the columns you need, as bare tuples
-        rows = curies_df[['chunk_row', 'row_pkid']].itertuples(index=False, name=None)
-
-        # stream an iterator to executemany; avoid tuple(...) materialization
         cursor.executemany(
             'INSERT INTO identifiers_cliques (identifier_id, clique_id) VALUES (?, ?);',
-            ((row_pkid, int(clique_arr[chunk_row]))
-             # int() if sqlite doesn't like numpy scalars
-             for chunk_row, row_pkid in rows)
-        )
-
+            ((row_pkid, int(clique_arr[chunk_row])) for chunk_row, row_pkid
+             in curies_df[['chunk_row', 'pkid']].itertuples(index=False, name=None)))
         clique_info_list = chunk.identifiers.tolist()
-        cursor.executemany('INSERT INTO identifiers_descriptions '
-                           '(description_id, identifier_id) '
-                           'VALUES (?, ?);',
-                           tuple((_insert_and_return_id(cursor,
-                                                        'INSERT INTO descriptions '
-                                                        '(desc) VALUES (?) '
-                                                        'RETURNING id;',
-                                                        (description_str,)),
-                                  curies_to_pkids[clique_identifier_info['i']])
-                                 for clique_info in clique_info_list
-                                 for clique_identifier_info in clique_info
-                                 for description_str
-                                 in clique_identifier_info.get('d', [])))
+        cursor.executemany(
+            'INSERT INTO identifiers_descriptions '
+            '(description_id, identifier_id) VALUES (?, ?);',
+            tuple((_insert_and_return_id(cursor,
+                                         'INSERT INTO descriptions '
+                                         '(desc) VALUES (?) RETURNING id;',
+                                         (description_str,)),
+                   curies_to_pkids[clique_identifier_info['i']])
+                  for clique_info in clique_info_list
+                  for clique_identifier_info in clique_info
+                  for description_str in clique_identifier_info.get('d', [])))
     return process_compendia_chunk
 
 def _read_compendia_chunks(url: str,
