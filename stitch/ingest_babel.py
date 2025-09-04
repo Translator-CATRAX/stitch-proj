@@ -171,8 +171,7 @@ def _cur_datetime_local_str() -> str:
 type _LogPrintImpl = Callable[[str, str], None]
 type SetEnabled = Callable[[bool], None]
 
-# Mutable implementation target (assigned below)
-_log_print_impl: _LogPrintImpl
+_log_print_impl: _LogPrintImpl  # Mutable implementation target (assigned below)
 
 @overload
 def _log_print(message: str) -> None: ...
@@ -194,8 +193,7 @@ def _make_log_print_controller() -> tuple[_LogPrintImpl, SetEnabled]:
         state["enabled"] = enabled
     return impl, set_enabled
 
-# Initialize the implementation and setter once (no globals/reassignment of the
-# function).
+# Initialize the implementation and setter once (no globals/reassignment)
 _log_print_impl, _set_log_print_enabled = _make_log_print_controller()
 
 def _create_index(table: str,
@@ -511,9 +509,9 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
         cursor = conn.cursor()
         biolink_curie_to_pkid = \
             _get_biolink_type_pkids_from_curies(cursor, tuple(chunk['type'].unique()))
-        curies_and_info = []
-        data_to_insert_cliques = []
-        primary_curies = []
+        chunk_data_unpk: dict[str, Any] = {'primary_curies': [],
+                                           'curies_and_info': [],
+                                           'data_to_insert_cliques': []}
         for row_id, row in enumerate(chunk.itertuples(index=False, name=None)):
             # For a non-umls compendia file, the order of the "row" tuple is:
             #   biolink_type, ic, identifiers, preferred_name, taxa
@@ -521,21 +519,24 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
             #   biolink_type, ic, preferred_name, taxa, identifiers
             if not non_umls_compendia_file:
                 row = tuple(row[i] for i in (0, 1, 4, 2, 3))
-            primary_curies.append(cast(list[dict[str, Any]], row[2])[0]['i']
-                                  if row[2] else None)
+            chunk_data_unpk['primary_curies'].append(cast(list[dict[str, Any]],
+                                                          row[2])[0]['i']
+                                                     if row[2] else None)
             for ci, identif_struct in enumerate(row[2]):
-                curies_and_info.append((identif_struct['i'],
-                                        identif_struct.get('l'),
-                                        ci,
-                                        identif_struct.get('t'),
-                                        row_id))
-            data_to_insert_cliques.append((su.nan_to_none(row[1]),
-                                           biolink_curie_to_pkid[row[0]], row[3]))
-        chunk['primary_curie'] = primary_curies
+                (chunk_data_unpk['curies_and_info']
+                 .append((identif_struct['i'],
+                          identif_struct.get('l'),
+                          ci,
+                          identif_struct.get('t'),
+                          row_id)))
+            (chunk_data_unpk['data_to_insert_cliques']
+             .append((su.nan_to_none(row[1]),
+                      biolink_curie_to_pkid[row[0]], row[3])))
+        chunk['primary_curie'] = chunk_data_unpk['primary_curies']
         # curies_df has four columns: curie, label, cis, and taxa;
         # each row corresponds to a different identifier in the chunk
         curies_df = \
-            pd.DataFrame.from_records(curies_and_info,
+            pd.DataFrame.from_records(chunk_data_unpk['curies_and_info'],
                                       columns=('curie', 'label', 'cis', 'taxa',
                                                'chunk_row'))
         curies_df['pkid'] = \
@@ -544,8 +545,7 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                                                       set(curies_df.curie))))
         mask = curies_df.pkid.isna()
         curies_df.loc[mask, 'pkid'] = \
-            (curies_df.loc[mask,
-                           'curie']
+            (curies_df.loc[mask, 'curie']
              .map({curie_label[0]:
                    _insert_and_return_id(cursor,
                                          "INSERT INTO identifiers "
@@ -583,14 +583,16 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                                         clique_data)
             for clique_data in tuple((pkid, *data) for pkid, data \
                                      in zip(tuple(curies_to_pkids[primary_id]
-                                                  for primary_id in primary_curies),
-                                            data_to_insert_cliques)))
-        clique_arr = chunk['clique_pkid'].to_numpy(copy=False)
+                                                  for primary_id
+                                                  in chunk_data_unpk['primary_curies']),
+                                            chunk_data_unpk['data_to_insert_cliques'])))
+        column_arr: list[Any] | numpy.ndarray[tuple[Any, ...], numpy.dtype[Any]] = \
+            chunk['clique_pkid'].to_numpy(copy=False)
         cursor.executemany(
             'INSERT INTO identifiers_cliques (identifier_id, clique_id) VALUES (?, ?);',
-            ((row_pkid, int(clique_arr[chunk_row])) for chunk_row, row_pkid
+            ((row_pkid, int(column_arr[chunk_row])) for chunk_row, row_pkid
              in curies_df[['chunk_row', 'pkid']].itertuples(index=False, name=None)))
-        clique_info_list = chunk.identifiers.tolist()
+        column_arr = chunk.identifiers.tolist()
         cursor.executemany(
             'INSERT INTO identifiers_descriptions '
             '(description_id, identifier_id) VALUES (?, ?);',
@@ -599,7 +601,7 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                                          '(desc) VALUES (?) RETURNING id;',
                                          (description_str,)),
                    curies_to_pkids[clique_identifier_info['i']])
-                  for clique_info in clique_info_list
+                  for clique_info in column_arr
                   for clique_identifier_info in clique_info
                   for description_str in clique_identifier_info.get('d', [])))
     return process_compendia_chunk
