@@ -161,8 +161,7 @@ def _get_args() -> argparse.Namespace:
                             'user; only script sets it internally')
     return arg_parser.parse_args()
 
-# this function does not return microseconds
-def _cur_datetime_local_no_ms() -> datetime:
+def _cur_datetime_local_no_ms() -> datetime:  # does not return microseconds
     return datetime.now().astimezone().replace(microsecond=0)
 
 def _cur_datetime_local_str() -> str:
@@ -677,7 +676,7 @@ def _make_url_ingester(conn: sqlite3.Connection,
                                  (num_chunks, total_size))
                 if any(chunk_ctr + glbl_chnk_cnt == chunks_per_analyze \
                        for chunks_per_analyze in chunks_per_analyze_list):
-                    _do_index_analyze(conn, log_work, False)
+                    _do_index_analyze(conn, log_work, True)
             except Exception as e:
                 conn.rollback()
                 raise e
@@ -886,7 +885,7 @@ def _make_get_make_chunkproc_args_compendia(insrt_missing_taxa: bool) -> \
     return functools.partial(_get_make_chunkproc_args_compendia,
                              insrt_missing_taxa)
 
-# pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+# pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements
 def _main_args(babel_compendia_url: str,
                babel_conflation_url: str,
                database_file_name: str,
@@ -924,6 +923,7 @@ def _main_args(babel_compendia_url: str,
             functools.partial(_ingest_biolink_categories, conn, log_work)(
                 *su.get_biolink_categories())
             _create_indices(conn, print_ddl_file_obj=print_ddl_file_obj)
+            _do_index_analyze(conn, log_work, False)
         do_ingest_compendia_url = \
             _make_url_ingester(conn, lines_per_chunk,
                                _read_compendia_chunks, log_work)
