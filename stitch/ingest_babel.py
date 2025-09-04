@@ -104,7 +104,8 @@ DEFAULT_DATABASE_FILE_NAME = 'babel.sqlite'
 DEFAULT_TEST_TYPE = None
 DEFAULT_COMPENDIA_TEST_FILE = "test-tiny.jsonl"
 DEFAULT_LINES_PER_CHUNK = 100_000
-WAL_SIZE = 1000
+WAL_SIZE = 100_000
+CACHE_SIZE = -8_000_000
 UNKNOWN_TAXON = "unknown taxon"  # this is needed for certain built-in test cases
 
 def _get_args() -> argparse.Namespace:
@@ -170,8 +171,7 @@ def _cur_datetime_local_str() -> str:
 type _LogPrintImpl = Callable[[str, str], None]
 type SetEnabled = Callable[[bool], None]
 
-# Mutable implementation target (assigned below)
-_log_print_impl: _LogPrintImpl
+_log_print_impl: _LogPrintImpl  # Mutable implementation target (assigned below)
 
 @overload
 def _log_print(message: str) -> None: ...
@@ -193,8 +193,7 @@ def _make_log_print_controller() -> tuple[_LogPrintImpl, SetEnabled]:
         state["enabled"] = enabled
     return impl, set_enabled
 
-# Initialize the implementation and setter once (no globals/reassignment of the
-# function).
+# Initialize the implementation and setter once (no globals/reassignment)
 _log_print_impl, _set_log_print_enabled = _make_log_print_controller()
 
 def _create_index(table: str,
@@ -210,18 +209,23 @@ def _create_index(table: str,
         print(statement, file=print_ddl_file_obj)
 
 def _do_index_analyze(conn: sqlite3.Connection,
-                      log_work: bool):
-    _log_print("starting database ANALYZE")
+                      log_work: bool,
+                      mandatory_analyze: bool = False):
+    if mandatory_analyze:
+        command_str = 'ANALYZE'
+    else:
+        command_str = 'PRAGMA optimize'
+    _log_print(f"running {command_str}")
     if log_work:
         analyze_start_time = time.time()
-    conn.execute("ANALYZE;")
-    _log_print("completed database ANALYZE")
+    conn.execute(command_str)
+    _log_print(f"completed {command_str}")
     if log_work:
         analyze_end_time = time.time()
         analyze_elapsed_time = \
             su.format_time_seconds_to_str(analyze_end_time -
                                           analyze_start_time)
-        _log_print(f"running ANALYZE took: {analyze_elapsed_time} "
+        _log_print(f"running {command_str} took: {analyze_elapsed_time} "
                    "(HHH:MM::SS)")
 
 def _set_auto_vacuum(conn: sqlite3.Connection,
@@ -376,7 +380,7 @@ def _get_database(database_file_name: str,
     conn = sqlite3.connect(database_file_name)
     _set_auto_vacuum(conn, False)
     _run_vacuum(conn)
-    _set_pragmas_for_ingestion(conn, WAL_SIZE)
+    _set_pragmas_for_ingestion(conn, WAL_SIZE, CACHE_SIZE)
     return conn
 
 def _first_label(group_df: pd.DataFrame) -> pd.Series:
@@ -505,9 +509,9 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
         cursor = conn.cursor()
         biolink_curie_to_pkid = \
             _get_biolink_type_pkids_from_curies(cursor, tuple(chunk['type'].unique()))
-        curies_and_info = []
-        data_to_insert_cliques = []
-        primary_curies = []
+        chunk_data_unpk: dict[str, Any] = {'primary_curies': [],
+                                           'curies_and_info': [],
+                                           'data_to_insert_cliques': []}
         for row_id, row in enumerate(chunk.itertuples(index=False, name=None)):
             # For a non-umls compendia file, the order of the "row" tuple is:
             #   biolink_type, ic, identifiers, preferred_name, taxa
@@ -515,21 +519,24 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
             #   biolink_type, ic, preferred_name, taxa, identifiers
             if not non_umls_compendia_file:
                 row = tuple(row[i] for i in (0, 1, 4, 2, 3))
-            primary_curies.append(cast(list[dict[str, Any]], row[2])[0]['i']
-                                  if row[2] else None)
+            chunk_data_unpk['primary_curies'].append(cast(list[dict[str, Any]],
+                                                          row[2])[0]['i']
+                                                     if row[2] else None)
             for ci, identif_struct in enumerate(row[2]):
-                curies_and_info.append((identif_struct['i'],
-                                        identif_struct.get('l'),
-                                        ci,
-                                        identif_struct.get('t'),
-                                        row_id))
-            data_to_insert_cliques.append((su.nan_to_none(row[1]),
-                                           biolink_curie_to_pkid[row[0]], row[3]))
-        chunk['primary_curie'] = primary_curies
+                (chunk_data_unpk['curies_and_info']
+                 .append((identif_struct['i'],
+                          identif_struct.get('l'),
+                          ci,
+                          identif_struct.get('t'),
+                          row_id)))
+            (chunk_data_unpk['data_to_insert_cliques']
+             .append((su.nan_to_none(row[1]),
+                      biolink_curie_to_pkid[row[0]], row[3])))
+        chunk['primary_curie'] = chunk_data_unpk['primary_curies']
         # curies_df has four columns: curie, label, cis, and taxa;
         # each row corresponds to a different identifier in the chunk
         curies_df = \
-            pd.DataFrame.from_records(curies_and_info,
+            pd.DataFrame.from_records(chunk_data_unpk['curies_and_info'],
                                       columns=('curie', 'label', 'cis', 'taxa',
                                                'chunk_row'))
         curies_df['pkid'] = \
@@ -538,8 +545,7 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                                                       set(curies_df.curie))))
         mask = curies_df.pkid.isna()
         curies_df.loc[mask, 'pkid'] = \
-            (curies_df.loc[mask,
-                           'curie']
+            (curies_df.loc[mask, 'curie']
              .map({curie_label[0]:
                    _insert_and_return_id(cursor,
                                          "INSERT INTO identifiers "
@@ -565,43 +571,39 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
             cursor.executemany('INSERT INTO identifiers_taxa '
                                '(identifier_id, taxa_identifier_id) '
                                'VALUES (?, ?);',
-                               tuple((curies_to_pkids[row_curie],
-                                      taxa_to_pkids[t])
+                               tuple((curies_to_pkids[row_curie], taxa_to_pkids[t])
                                      for row_curie, _, _, row_taxa, _, _
-                                     in curies_df.itertuples(index=False,
-                                                             name=None)
+                                     in curies_df.itertuples(index=False, name=None)
                                      for t in cast(list[str], row_taxa)))
         chunk['clique_pkid'] = \
             tuple(_insert_and_return_id(cursor,
-                                        'INSERT INTO cliques '
-                                        '(primary_identifier_id, ic, type_id, '
-                                        'preferred_name) '
+                                        'INSERT INTO cliques (primary_identifier_id, '
+                                        'ic, type_id, preferred_name) '
                                         'VALUES (?, ?, ?, ?) RETURNING id;',
                                         clique_data)
             for clique_data in tuple((pkid, *data) for pkid, data \
                                      in zip(tuple(curies_to_pkids[primary_id]
-                                                  for primary_id in primary_curies),
-                                            data_to_insert_cliques)))
-        cursor.executemany('INSERT INTO identifiers_cliques '
-                           '(identifier_id, clique_id) '
-                           'VALUES (?, ?);',
-                           tuple((row_pkid,
-                                  int(chunk['clique_pkid'].tolist()[chunk_row]))
-                                 for _, _, _, _, chunk_row, row_pkid
-                                 in curies_df.itertuples(index=False)))
-        cursor.executemany('INSERT INTO identifiers_descriptions '
-                           '(description_id, identifier_id) '
-                           'VALUES (?, ?);',
-                           tuple((_insert_and_return_id(cursor,
-                                                        'INSERT INTO descriptions '
-                                                        '(desc) VALUES (?) '
-                                                        'RETURNING id;',
-                                                        (description_str,)),
-                                  curies_to_pkids[clique_identifier_info['i']])
-                                 for clique_info in chunk.identifiers.tolist()
-                                 for clique_identifier_info in clique_info
-                                 for description_str
-                                 in clique_identifier_info.get('d', [])))
+                                                  for primary_id
+                                                  in chunk_data_unpk['primary_curies']),
+                                            chunk_data_unpk['data_to_insert_cliques'])))
+        column_arr: list[Any] | numpy.ndarray[tuple[Any, ...], numpy.dtype[Any]] = \
+            chunk['clique_pkid'].to_numpy(copy=False)
+        cursor.executemany(
+            'INSERT INTO identifiers_cliques (identifier_id, clique_id) VALUES (?, ?);',
+            ((row_pkid, int(column_arr[chunk_row])) for chunk_row, row_pkid
+             in curies_df[['chunk_row', 'pkid']].itertuples(index=False, name=None)))
+        column_arr = chunk.identifiers.tolist()
+        cursor.executemany(
+            'INSERT INTO identifiers_descriptions '
+            '(description_id, identifier_id) VALUES (?, ?);',
+            tuple((_insert_and_return_id(cursor,
+                                         'INSERT INTO descriptions '
+                                         '(desc) VALUES (?) RETURNING id;',
+                                         (description_str,)),
+                   curies_to_pkids[clique_identifier_info['i']])
+                  for clique_info in column_arr
+                  for clique_identifier_info in clique_info
+                  for description_str in clique_identifier_info.get('d', [])))
     return process_compendia_chunk
 
 def _read_compendia_chunks(url: str,
@@ -657,6 +659,7 @@ def _make_url_ingester(conn: sqlite3.Connection,
                 conn.execute("BEGIN TRANSACTION;")
                 if log_work and chunk_ctr == 1:
                     start_time = time.time()
+                chunk_start_time = time.time()
                 process_chunk(chunk)
                 conn.commit()
                 if log_work:
@@ -669,13 +672,12 @@ def _make_url_ingester(conn: sqlite3.Connection,
                     else:
                         num_chunks = None
                     assert start_time is not None # assigned on 1st iter
-                    _do_log_work((start_time,
-                                  start_time if chunk_ctr == 1 else time.time()),
+                    _do_log_work((start_time, chunk_start_time),
                                  (chunk_ctr, glbl_chnk_cnt),
                                  (num_chunks, total_size))
                 if any(chunk_ctr + glbl_chnk_cnt == chunks_per_analyze \
                        for chunks_per_analyze in chunks_per_analyze_list):
-                    _do_index_analyze(conn, log_work)
+                    _do_index_analyze(conn, log_work, False)
             except Exception as e:
                 conn.rollback()
                 raise e
@@ -752,14 +754,19 @@ def _get_conflation_files(conflation_files_index_url: str) ->\
     return tuple(conflation_sorted_files), conflation_map_names
 
 def _set_pragmas_for_ingestion(conn: sqlite3.Connection,
-                               wal_size: int):
-    for s in ('synchronous = OFF', 'journal_mode = WAL',
-              'optimize', f'wal_autocheckpoint = {wal_size}'):
+                               wal_size: int,
+                               cache_size: int):
+    for s in ('synchronous = OFF',
+              'journal_mode = WAL',
+              'temp_store = MEMORY',
+              f'cache_size = {cache_size}',
+              f'wal_autocheckpoint = {wal_size}'):
         conn.execute(f"PRAGMA {s}")
         _log_print(f"setting PRAGMA {s}")
 
 def _set_pragmas_for_querying(conn: sqlite3.Connection):
-    for s in ('wal_checkpoint(FULL)', 'journal_mode = DELETE'):
+    for s in ('wal_checkpoint(FULL)',
+              'journal_mode = DELETE'):
         conn.execute(f"PRAGMA {s}")
         _log_print(f"setting PRAGMA {s}")
     _set_auto_vacuum(conn, auto_vacuum_on=True)
@@ -772,7 +779,7 @@ def _do_integrity_check(conn: sqlite3.Connection):
 
 def _cleanup_indices(conn: sqlite3.Connection,
                      log_work: bool):
-    _do_index_analyze(conn, log_work)
+    _do_index_analyze(conn, log_work, True)
     _log_print("setting PRAGMA locking_mode to EXCLUSIVE")
     conn.execute("PRAGMA locking_mode=EXCLUSIVE")
     _run_vacuum(conn)
