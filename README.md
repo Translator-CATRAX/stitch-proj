@@ -25,7 +25,7 @@ local Babel sqlite database.
 - CPython 3.12, which needs to be available in your path as `python3.12`, with the `venv` library installed and in the python path
 - At least 32 GiB of system memory
 - Sufficient disk space in wherever filesystem hosts your `stitch-proj` directory, which will depend on your use-case:
-  - To build `babel.sqlite`, at least 600 GiB of free file system storage space (usage transiently spikes to ~522 GiB and then the final database size is ~172 GiB).
+  - To build `babel.sqlite`, at least 600 GiB of free file system storage space (usage transiently spikes to ~522 GiB and then the final database size is ~181 GiB).
   - To use a local `babel.sqlite` in your application, 200 GiB of free system storage space to store the sqlite file.
 - Linux or MacOS (this software has not been tested on Windows; see "Systems on which this software has been tested").
 - If you want to download the pre-built Babel sqlite database file, you will need to have `curl` or `wget` installed.
@@ -102,10 +102,9 @@ directory is. You will need this in order for the unit test module
 - `tail -f ingest-babel.log` (so you can watch progress)
 - In another terminal session, watch memory usage using `top`
 
-After approximately 28 hours, the ingest script should save the database as a file
-`/home/ubuntu/stitch-proj/babel.sqlite`; as of the March 31, 2025 release of Babel, the
-`babel.sqlite` file produced by the `ingest_babel.py` script is 172 GiB. The
-`ingest_babel.py` script (internally) turns off buffering for the `stdout`
+After approximately 35 hours, the ingest script should save the database as a file
+`/home/ubuntu/stitch-proj/babel.sqlite` (see `Requirements` for the expected size). 
+The `ingest_babel.py` script (internally) turns off buffering for the `stdout`
 and `stderr` streams, so that output logging information is seen immediately
 in the logfile as soon as an update is "printed" by the python script.
 This behavior cannot be overridden at the `python3.12` command-line.
@@ -297,5 +296,14 @@ ln -s /mnt/localssd/stitch-proj /home/ubuntu/stitch-proj
 ```
 (but that symbolic link will persist even when you stop and then start the instance).
 
+# Miscellaneous tasks
+
+## After I build the sqlite ingest of Babel, how to get its size in GiB?
+Like this:
+```
+stat -c %s babel-20250817.sqlite | awk '{printf "%.2f GiB\n", $1/1024/1024/1024}'
+```
+
 # How to cite Babel in a publication
 Please see the [Babel `CITATION.cff` file](https://github.com/TranslatorSRI/Babel/blob/master/CITATION.cff).
+
