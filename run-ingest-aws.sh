@@ -6,7 +6,7 @@ STITCH_TMP_DIR=${STITCH_DIR}/tmp
 STITCH_LOG_FILE=${STITCH_DIR}/ingest-babel.log
 STITCH_SQLITE_FILE=${STITCH_DIR}/babel.sqlite
 
-BABEL_BASE_URL=https://stars.renci.org/var/babel_outputs/2025aug17
+BABEL_BASE_URL=https://stars.renci.org/var/babel_outputs/2025sep1
 BABEL_COMPENDIA_BASE_URL=${BABEL_BASE_URL}/compendia/
 BABEL_CONFLATION_BASE_URL=${BABEL_BASE_URL}/conflation/
 
