@@ -35,7 +35,7 @@ local Babel sqlite database.
 The `stitch-proj` project's module `ingest_babel.py` has been tested in three compute environments:
 
 ## Ubuntu/Xeon
-- We have tested a full run of `ingest_babel.py` on this system ([release `babel-sqlite-20250331`](https://github.com/Translator-CATRAX/stitch-proj/releases/tag/babel-20250331)). This instance has instance name `stitch2.rtx.ai` and is in the `us-west-1` AWS region.
+- We have tested a full run of `ingest_babel.py` on this system ([release `babel-sqlite-20250331`](https://github.com/Translator-CATRAX/stitch-proj/releases/tag/babel-20250331) and [release `babel-sqlite-20250817`](https://github.com/Translator-CATRAX/stitch-proj/releases/tag/babel-20250817)). This instance has instance name `stitch2.rtx.ai` and is in the `us-west-1` AWS region.
 - Ubuntu 24.04
 - `i4i.2xlarge` instance (Intel Xeon 8375C processor, which is x86_64 architecture), 64 GiB of memory
 - `gp3` root volume (500 GiB)
