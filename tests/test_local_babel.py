@@ -19,7 +19,7 @@ from stitch.local_babel import (
 
 @pytest.fixture(scope="session")
 def db_filename() -> str:
-    return "db/babel-20250331.sqlite"
+    return "db/babel-20250901.sqlite"
 
 @pytest.fixture(scope="function")
 def pool():
@@ -126,14 +126,13 @@ def test_map_curie_to_preferred_curies(readonly_conn: sqlite3.Connection):
     assert len(res)==0
     res = map_curie_to_preferred_curies(readonly_conn, 'MESH:D014867')
     assert res == (('CHEBI:15377', 'biolink:SmallMolecule', 'MESH:D014867'),)
-    pprint.pprint(res)
-    res = map_curie_to_preferred_curies(readonly_conn, 'UMLS:C0000657')
-    assert res == (('MESH:C115990', 'biolink:ChemicalEntity', 'UMLS:C0000657'),
-                   ('UMLS:C0000657', 'biolink:Protein', 'UMLS:C0000657'))
+    res = map_curie_to_preferred_curies(readonly_conn, 'MESH:C115990')
+    assert set(res) == {('MESH:C115990', 'biolink:ChemicalEntity', 'MESH:C115990'),
+                        ('UMLS:C0000657', 'biolink:Protein', 'MESH:C115990')}
 
 
 def test_map_chembl(readonly_conn: sqlite3.Connection):
     res = map_curie_to_preferred_curies(readonly_conn, 'CHEMBL.COMPOUND:CHEMBL339829')
     assert res == (('CHEMBL.COMPOUND:CHEMBL339829',
-                    'biolink:SmallMolecule',
+                    'biolink:ChemicalEntity',
                     'CHEMBL.COMPOUND:CHEMBL339829'),)
