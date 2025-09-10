@@ -102,7 +102,8 @@ directory is. You will need this in order for the unit test module
 - `tail -f ingest-babel.log` (so you can watch progress)
 - In another terminal session, watch memory usage using `top`
 
-After approximately 35 hours, the ingest script should save the database as a file
+After approximately 37 hours, the ingest script should complete, leaving 
+the finished database as a file
 `/home/ubuntu/stitch-proj/babel.sqlite` (see `Requirements` for the expected size). 
 The `ingest_babel.py` script (internally) turns off buffering for the `stdout`
 and `stderr` streams, so that output logging information is seen immediately
