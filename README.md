@@ -165,7 +165,8 @@ have not yet done so.  See issue 16:
 https://github.com/Translator-CATRAX/stitch-proj/issues/16
 
 # Analyzing the local Babel sqlite database
-Consider installing and compiling `sqlite3_analyzer`, which is available
+If you are a developer looking to improve `local_babel.py`, 
+consider installing and compiling `sqlite3_analyzer`, which is available
 from the [sqlite software project area on GitHub](https://github.com/sqlite/sqlite).
 On Ubuntu, you can just perform the following steps to have
 `sqlite3_analyzer` available in `/usr/local/bin`:
