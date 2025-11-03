@@ -230,7 +230,7 @@ FAILED tests/test_stitchutils.py::test_get_biolink_categories - urllib.error.URL
 # How to run just the unit test suite
 First, you need to make sure that underneath the top-level
 "stich" directory, there is a subdirectory "db" containing 
-the `babel-20250331.sqlite` file (see section 
+the `babel-20250901.sqlite` file (see section 
 "Downloading a pre-built Babel sqlite database file").
 Then you can run the unit test suite, like this:
 ```
