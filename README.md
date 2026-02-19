@@ -304,6 +304,12 @@ ln -s /mnt/localssd/stitch-proj /home/ubuntu/stitch-proj
 ```
 (but that symbolic link will persist even when you stop and then start the instance).
 
+# Subdirectories in `stitch-proj`:
+- `stitch`: python modules for `stitch-proj`, that are meant to be imported and used
+- `tests`: pytest unit test modules
+- `tools`: tools that are actually used in maintaining or debugging `stitch-proj`
+- `old-tools`: tools that were used at one time but are now kept only for archival purposes
+
 # Miscellaneous tasks
 
 ## After I build the sqlite ingest of Babel, how to get its size in GiB?
