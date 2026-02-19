@@ -56,6 +56,7 @@
         CREATE TABLE conflation_members (
         cluster_id INTEGER NOT NULL,
         identifier_id INTEGER NOT NULL,
+        is_canonical INTEGER NOT NULL CHECK (is_canonical in (0, 1)),
         FOREIGN KEY(cluster_id) REFERENCES conflation_clusters(id),
         FOREIGN KEY(identifier_id) REFERENCES identifiers(id),
         UNIQUE(cluster_id, identifier_id))
@@ -70,3 +71,4 @@ CREATE INDEX idx_identifiers_taxa_identifier_id ON identifiers_taxa (identifier_
 CREATE INDEX idx_identifiers_taxa_taxa_identifier_id ON identifiers_taxa (taxa_identifier_id);
 CREATE INDEX idx_conflation_members_identifier_id ON conflation_members (identifier_id);
 CREATE INDEX idx_conflation_clusters_type ON conflation_clusters (type);
+CREATE UNIQUE INDEX one_canonical_per_cluster ON conflation_members (cluster_id) WHERE is_canonical = 1;
