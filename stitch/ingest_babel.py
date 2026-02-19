@@ -492,13 +492,13 @@ def _get_pkids_from_curies_with_missing(cursor: sqlite3.Cursor,
 
 def _get_taxa_pkids_fill_in_if_necessary(cursor: sqlite3.Cursor,
                                          curies: set[str],
-                                         insrt_missing_taxa: bool) -> \
+                                         insrt_msng_taxa: bool) -> \
                                          dict[str, Optional[int]]:
     taxa_to_pkids = _get_pkids_from_curies_with_missing(cursor, curies)
     # Build a mapping from taxon CURIE to its id
     for taxon_curie, taxon_id in taxa_to_pkids.items():
         if taxon_id is None:
-            if insrt_missing_taxa:
+            if insrt_msng_taxa:
                 taxa_to_pkids[taxon_curie] = \
                     _insert_and_return_id(cursor,
                                           'INSERT INTO identifiers '
@@ -519,7 +519,7 @@ def _get_biolink_type_pkids_from_curies(cursor: sqlite3.Cursor, curies: tuple[st
                                 curies).fetchall()))
 
 def _make_compendia_chunk_processor(conn: sqlite3.Connection,
-                                    insrt_missing_taxa: bool = False,
+                                    insrt_msng_taxa: bool = False,
                                     non_umls_compendia_file: bool = True) -> Callable:
     def process_compendia_chunk(chunk: pd.DataFrame):
         cursor = conn.cursor()
@@ -582,7 +582,7 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
         if taxa:
             taxa_to_pkids = \
                 _get_taxa_pkids_fill_in_if_necessary(cursor, taxa,
-                                                     insrt_missing_taxa)
+                                                     insrt_msng_taxa)
             cursor.executemany('INSERT INTO identifiers_taxa '
                                '(identifier_id, taxa_identifier_id) '
                                'VALUES (?, ?);',
