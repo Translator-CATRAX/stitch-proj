@@ -267,8 +267,11 @@ cd stitch-proj
 venv/bin/python3 stitch/ingest_babel.sql --print-ddl --dry-run 2>ddl.sql 
 ``` 
 On macOS, run the DbVisualizer application (free version
-24.3.3). Under the "File" menu select "Open File...", then navigate to the new
-`ddl.sql` file.  In the treeview control under "SQLite" on the left, open
+24.3.3). If you don't see "SQLite" in the treeview control on the left, then
+under the "Database" menu, select "Create Database Connection" and double-click
+on "sqlite". Then, under the "File" menu select "Open...", then navigate to the new
+`ddl.sql` file.  Click  the play button to load the DDL into the connected 
+database. In the treeview control under "SQLite" on the left, open
 "Schema" and click on "Tables". In the "Tables" view in the main application
 pane, click on the "References" tab. Use macOS system screen-capture tool to
 obtain a PNG of the schema diagram.

@@ -59,7 +59,7 @@
         is_canonical INTEGER NOT NULL CHECK (is_canonical in (0, 1)),
         FOREIGN KEY(cluster_id) REFERENCES conflation_clusters(id),
         FOREIGN KEY(identifier_id) REFERENCES identifiers(id),
-        UNIQUE(cluster_id, identifier_id))
+        UNIQUE(cluster_id, identifier_id));
     
 CREATE INDEX idx_cliques_type_id ON cliques (type_id);
 CREATE INDEX idx_cliques_primary_identifier_id ON cliques (primary_identifier_id);
