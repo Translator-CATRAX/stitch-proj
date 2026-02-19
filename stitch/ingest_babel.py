@@ -59,7 +59,6 @@ Test Modes
 How To Run (example)
 --------------------
 Run on a long-lived host inside screen/tmux and stream logs to a file:
-
     python3.12 -u ingest_babel.py > ingest_babel.log 2>&1
     tail -f ingest_babel.log
 
@@ -68,8 +67,6 @@ There is also a script "instance-memory-tracker.sh", in the stitch
 project area, that will record the script's memory usage (see the
 main README.md in the stitch project area).
 
-Acknowledgements
-----------------
 Thank you to Gaurav Vaidya for helpful information about Babel.
 """
 import argparse
@@ -84,7 +81,6 @@ import sys
 import tempfile
 import time
 from collections.abc import Callable
-from datetime import datetime
 from typing import IO, Any, Iterable, Optional, cast, overload
 from urllib.parse import urljoin
 
@@ -106,7 +102,7 @@ DEFAULT_COMPENDIA_TEST_FILE = "test-tiny.jsonl"
 DEFAULT_LINES_PER_CHUNK = 100_000
 WAL_SIZE = 100_000
 CACHE_SIZE = -8_000_000
-UNKNOWN_TAXON = "unknown taxon"  # this is needed for certain built-in test cases
+UNKNOWN_TAXON = "unknown taxon"  # needed for certain built-in test cases
 
 def _get_args() -> argparse.Namespace:
     arg_parser = \
@@ -131,8 +127,10 @@ def _get_args() -> argparse.Namespace:
                             help='the size of a chunk, in rows of JSON-lines')
     arg_parser.add_argument('--use-existing-db', dest='use_existing_db',
                             default=False, action='store_true',
-                            help='do not ingest any compendia files; '
-                            'just show the work plan (like \"make -n\")')
+                            help='if True, do not create a new table schema with '
+                            'empty tables; use an existing sqlite file (this'
+                            'would be an unusual situation where the tables'
+                            'and indices have already been created).')
     arg_parser.add_argument('--test-type', type=int, dest='test_type',
                             default=DEFAULT_TEST_TYPE,
                             help='if running a test, specify the test type '
@@ -161,12 +159,6 @@ def _get_args() -> argparse.Namespace:
                             'user; only script sets it internally')
     return arg_parser.parse_args()
 
-def _cur_datetime_local_no_ms() -> datetime:  # does not return microseconds
-    return datetime.now().astimezone().replace(microsecond=0)
-
-def _cur_datetime_local_str() -> str:
-    return _cur_datetime_local_no_ms().isoformat()
-
 type _LogPrintImpl = Callable[[str, str], None]
 type SetEnabled = Callable[[bool], None]
 
@@ -185,7 +177,7 @@ def _make_log_print_controller() -> tuple[_LogPrintImpl, SetEnabled]:
     state: dict[str, bool] = {"enabled": False}
     def impl(message: str, end: str = "\n") -> None:
         if state["enabled"]:
-            date_time_local = _cur_datetime_local_str()
+            date_time_local = su.cur_datetime_local_str()
             print(f"{date_time_local}: {message}",
                   end=end, file=sys.stderr, flush=True)
     def set_enabled(enabled: bool) -> None:
@@ -195,15 +187,21 @@ def _make_log_print_controller() -> tuple[_LogPrintImpl, SetEnabled]:
 # Initialize the implementation and setter once (no globals/reassignment)
 _log_print_impl, _set_log_print_enabled = _make_log_print_controller()
 
-def _create_index(table: str,
-                  col: str,
-                  conn: sqlite3.Connection,
-                  print_ddl_file_obj: IO[str] | None = None):
-    statement = ('CREATE INDEX '
-                 f'idx_{table}_{col} '
-                 f'ON {table} ({col});')
+def _create_index(
+        table: str, col: str,
+        conn: sqlite3.Connection,
+        print_ddl_file_obj: IO[str] | None = None,
+        **extra_args: str
+):
+    index_name = extra_args.get('index_name', f'idx_{table}_{col}')
+    index_type_blank_or_unique = extra_args.get('index_type_blank_or_unique', '')
+    index_where_clause = extra_args.get('index_where_clause', '')
+    statement = (f'CREATE {index_type_blank_or_unique} INDEX '
+                 f'{index_name} '
+                 f'ON {table} ({col}) {index_where_clause};')
+    _log_print(f"creating {index_type_blank_or_unique} index {index_name} " \
+               f"on column \"{col}\" in table \"{table}\"")
     conn.execute(statement)
-    _log_print(f"creating index on column \"{col}\" in table \"{table}\"")
     if print_ddl_file_obj is not None:
         print(statement, file=print_ddl_file_obj)
 
@@ -232,9 +230,6 @@ def _set_auto_vacuum(conn: sqlite3.Connection,
     switch_str = 'FULL' if auto_vacuum_on else 'NONE'
     _log_print(f"setting auto_vacuum to {switch_str}")
     conn.execute(f"PRAGMA auto_vacuum={switch_str};")
-
-def _merge_ints_to_str(t: Iterable[int], delim: str) -> str:
-    return delim.join(map(str, t))
 
 SQL_CREATE_TABLE_TYPES = \
     '''
@@ -307,7 +302,7 @@ SQL_CREATE_TABLE_CONFLATION_CLUSTERS = \
         CREATE TABLE conflation_clusters (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         type INTEGER NOT NULL CHECK (type in
-        ({_merge_ints_to_str(ALLOWED_CONFLATION_TYPES, ', ')})));
+        ({su.merge_ints_to_str(ALLOWED_CONFLATION_TYPES, ', ')})));
     '''
 
 SQL_CREATE_TABLE_CONFLATION_MEMBERS = \
@@ -315,6 +310,7 @@ SQL_CREATE_TABLE_CONFLATION_MEMBERS = \
         CREATE TABLE conflation_members (
         cluster_id INTEGER NOT NULL,
         identifier_id INTEGER NOT NULL,
+        is_canonical INTEGER NOT NULL CHECK (is_canonical in (0, 1)),
         FOREIGN KEY(cluster_id) REFERENCES conflation_clusters(id),
         FOREIGN KEY(identifier_id) REFERENCES identifiers(id),
         UNIQUE(cluster_id, identifier_id))
@@ -350,13 +346,10 @@ def _create_empty_database(database_file_name: str,
         ('identifiers_taxa', SQL_CREATE_TABLE_IDENTIFIERS_TAXA),
         ('conflation_clusters', SQL_CREATE_TABLE_CONFLATION_CLUSTERS),
         ('conflation_members', SQL_CREATE_TABLE_CONFLATION_MEMBERS))
-    # The `ic` field is the node's "information content", which seems to be
-    # assigned by a software program called "UberGraph", and which is a real
+    # The `ic` is the "information content" assigned by UberGraph. It is a real
     # number between 0 and 100; 100 means that the concept is as specific as it
     # can possibly be, in the relevant ontology (so I suppose it is a leaf node
-    # with no subclasses).  A lower `ic` score presumably means it has
-    # subclasses; the lower the `ic` score, the more "general" the concept
-    # is. So, `ic` seems to me to really be a measure of "semantic specificity"
+    # with no subclasses). The lower the `ic` score, the more "general" the concept.
     for table_name, statement in table_creation_statements:
         cur.execute(statement)
         _log_print(f"creating table: \"{table_name}\"")
@@ -434,35 +427,61 @@ def _make_conflation_chunk_processor(conn: sqlite3.Connection,
                                      conflation_type_id: int) -> Callable:
     if conflation_type_id not in ALLOWED_CONFLATION_TYPES:
         raise ValueError(f"invalid conflation_type value: {conflation_type_id};"
-                         "it must be in the set: {ALLOWED_CONFLATION_TYPES}")
+                         f"it must be in the set: {ALLOWED_CONFLATION_TYPES}")
     def process_conflation_chunk(chunk: Iterable[str]):
-        cursor = conn.cursor()
+        cursor = conn.cursor()  # Create temp table once per connection (outside loop)
+        cursor.execute("""
+            CREATE TEMP TABLE IF NOT EXISTS tmp_curie_list (
+                curie TEXT PRIMARY KEY, ord INTEGER NOT NULL
+            ) WITHOUT ROWID;
+        """)
         for line in chunk:
+            line = line.strip()
+            if not line:
+                continue
             curie_list = ast.literal_eval(line)
-            if not curie_list:
-                raise ValueError("empty curie_list")
-            # make new id
-            cluster_id = _insert_and_return_id(cursor,
-                                               "INSERT INTO conflation_clusters (type) "
-                                               "VALUES (?) RETURNING id;",
-                                               (conflation_type_id,))
-            placeholders = ','.join(['?'] * len(curie_list))
-            query = f"SELECT id from identifiers WHERE curie IN ({placeholders});"
-            assert len(curie_list)==query.count('?'), "placeholder count mismatch"
-            ids = conn.execute(query, curie_list).fetchall()
-            insert_data = tuple((cluster_id, curie_id_tuple[0]) for \
-                                curie_id_tuple in ids)
-            cursor.executemany("INSERT INTO conflation_members "
-                               "(cluster_id, identifier_id) "
-                               "VALUES (?, ?);",
-                               insert_data)
+            su.validate_curie_list(curie_list)
+            curie_list_set = set(curie_list)
+            if len(curie_list_set) != len(curie_list):
+                first_curie = curie_list[0]
+                curie_list = [first_curie] + list(curie_list_set - {first_curie})
+            canonical_curie = curie_list[0]
+            n = len(curie_list)
+            cluster_id = _insert_and_return_id(
+                cursor,
+                "INSERT INTO conflation_clusters (type) VALUES (?) RETURNING id;",
+                (conflation_type_id,),)
+            # Clear from previous iteration
+            cursor.execute("DELETE FROM tmp_curie_list;")
+            # Bulk insert current cluster
+            cursor.executemany(
+                "INSERT INTO tmp_curie_list (curie, ord) VALUES (?, ?);",
+                ((curie, i) for i, curie in enumerate(curie_list)))
+            # Join against identifiers and preserve order
+            query = """
+                SELECT t.curie, i.id FROM tmp_curie_list AS t
+                JOIN identifiers AS i ON i.curie = t.curie ORDER BY t.ord;
+            """
+            rows = cursor.execute(query).fetchall()
+            curies_found = {curie for (curie, _) in rows}
+            if canonical_curie not in curies_found:
+                raise ValueError("canonical CURIE not found in identifiers: "
+                                 f"{canonical_curie}")
+            if len(rows) != n:
+                missing = set(curie_list) - curies_found
+                raise ValueError("missing CURIE(s) in identifiers; the first 10 "
+                                 f"(or fewer) identifiers are: {sorted(missing)[:10]}")
+            insert_data = tuple((cluster_id, curie_id, 1
+                                 if curie == canonical_curie else 0)
+                                for (curie, curie_id) in rows)
+            cursor.executemany(
+                "INSERT INTO conflation_members "
+                "(cluster_id, identifier_id, is_canonical) VALUES (?, ?, ?);",
+                insert_data)
     return process_conflation_chunk
 
 def _flatten_taxa(taxa_col: Iterable[Optional[list[str]]]) -> set[str]:
-    return {taxon
-            for taxon_list in taxa_col
-            if taxon_list
-            for taxon in taxon_list}
+    return {taxon for taxon_list in taxa_col if taxon_list for taxon in taxon_list}
 
 def _get_pkids_from_curies_with_missing(cursor: sqlite3.Cursor,
                                         curies: set[str]) -> \
@@ -488,8 +507,7 @@ def _get_taxa_pkids_fill_in_if_necessary(cursor: sqlite3.Cursor,
                                           'RETURNING id;',
                                           (taxon_curie,))
             else:
-                raise ValueError("taxon missing from database: "
-                                 f"{taxon_curie}")
+                raise ValueError(f"taxon missing from database: {taxon_curie}")
     return taxa_to_pkids
 
 def _get_biolink_type_pkids_from_curies(cursor: sqlite3.Cursor, curies: tuple[str]) \
@@ -498,8 +516,7 @@ def _get_biolink_type_pkids_from_curies(cursor: sqlite3.Cursor, curies: tuple[st
     return dict((cursor.execute("SELECT curie, id FROM types "
                                 "WHERE curie IN "
                                 f"({placeholders})",
-                                curies)
-                 .fetchall()))
+                                curies).fetchall()))
 
 def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                                     insrt_missing_taxa: bool = False,
@@ -514,8 +531,7 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
         for row_id, row in enumerate(chunk.itertuples(index=False, name=None)):
             # For a non-umls compendia file, the order of the "row" tuple is:
             #   biolink_type, ic, identifiers, preferred_name, taxa
-            # For the "umls.txt" compendia file, the order of the "row" tuple is:
-            #   biolink_type, ic, preferred_name, taxa, identifiers
+            # For "umls.txt" it is: biolink_type, ic, preferred_name, taxa, identifiers
             if not non_umls_compendia_file:
                 row = tuple(row[i] for i in (0, 1, 4, 2, 3))
             chunk_data_unpk['primary_curies'].append(cast(list[dict[str, Any]],
@@ -607,8 +623,7 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
 
 def _read_compendia_chunks(url: str,
                            lines_per_chunk: int) -> Iterable[pd.DataFrame]:
-    return pd.read_json(url,
-                        lines=True,
+    return pd.read_json(url, lines=True,
                         chunksize=lines_per_chunk)
 
 def _read_conflation_chunks(url: str,
@@ -620,7 +635,7 @@ def _do_log_work(start_times: tuple[float, float],
                  job_info: tuple[Optional[int], Optional[int]]):
     num_chunks, total_size = job_info
     chunk_ctr, glbl_chnk_cnt_start = progress_info
-    log_str = f"Loading compendia chunk {chunk_ctr}"
+    log_str = f"Loading chunk {chunk_ctr}"
     elapsed_time = time.time() - start_times[0]
     elapsed_time_str = su.format_time_seconds_to_str(elapsed_time)
     chunk_elapsed_time_str = su.format_time_seconds_to_str(time.time() -
@@ -630,12 +645,21 @@ def _do_log_work(start_times: tuple[float, float],
                 f"; time spent on URL: {elapsed_time_str}; "
                 f"spent on chunk: {chunk_elapsed_time_str}")
     if total_size is not None and num_chunks is not None:
-        pct_complete = min(100.0, 100.0 * (chunk_ctr / num_chunks))
-        time_to_complete = elapsed_time * \
-            (100.0 - pct_complete)/pct_complete
-        time_to_complete_str = \
-            su.format_time_seconds_to_str(time_to_complete)
-        log_str += (f"; URL {pct_complete:0.2f}% complete"
+        pct_complete: float
+        if num_chunks > 0:
+            pct_complete = min(100.0, 100.0 * (chunk_ctr / num_chunks))
+            pct_complete_str = f"{pct_complete:0.2f}"
+        else:
+            pct_complete_str = "UNKNOWN"
+            pct_complete = 0.0
+        if pct_complete > 0.0:
+            time_to_complete = elapsed_time * \
+                (100.0 - pct_complete)/pct_complete
+            time_to_complete_str = \
+                su.format_time_seconds_to_str(time_to_complete)
+        else:
+            time_to_complete_str = "UNKNOWN"
+        log_str += (f"; URL {pct_complete_str}% complete"
                     f"; time to complete URL: {time_to_complete_str}")
     _log_print(log_str)
 
@@ -643,9 +667,8 @@ def _make_url_ingester(conn: sqlite3.Connection,
                        lines_per_chunk: int,
                        read_chunks: Callable[[str, int], Iterable[ChunkType]],
                        log_work: bool = False) -> Callable:
-    chunks_per_analyze_list: list[int] = [int(x) for x in
-                                          numpy.ceil(numpy.array(ROWS_PER_ANALYZE)/\
-                                                     lines_per_chunk)]
+    chunks_per_analyze_list: list[int] = \
+        [int(x) for x in numpy.ceil(numpy.array(ROWS_PER_ANALYZE)/lines_per_chunk)]
     def ingest_from_url(url: str,
                         process_chunk: Callable[[ChunkType], None],
                         total_size: Optional[int] = None,
@@ -687,6 +710,11 @@ def _create_indices(conn: sqlite3.Connection,
                     print_ddl_file_obj: IO[str] | None = None):
     for table, col in SQL__CREATE_INDEX_WORK_PLAN:
         _create_index(table, col, conn, print_ddl_file_obj)
+    _create_index('conflation_members', 'cluster_id', conn,
+                  print_ddl_file_obj=print_ddl_file_obj,
+                  index_name='one_canonical_per_cluster',
+                  index_type_blank_or_unique='UNIQUE',
+                  index_where_clause='WHERE is_canonical = 1')
 
 TEST_2_COMPENDIA = ('OrganismTaxon.txt', 'ComplexMolecularMixture.txt',
                     'Polypeptide.txt', 'PhenotypicFeature.txt')
@@ -695,12 +723,6 @@ TEST_3_CONFLATION = ('DrugChemical.txt',)
 TEST_4_COMPENDIA = ('umls.txt',)
 TAXON_FILE = 'OrganismTaxon.txt'
 FILE_NAME_SUFFIX_START_NUMBERED = COMPENDIA_FILE_SUFFIX + '.00'
-
-def _create_file_map(file_name: str) -> dict[str, FileEntry]:
-    file_size = os.path.getsize(file_name)
-    file_modif = os.path.getmtime(file_name)
-    file_entry = FileEntry(file_name, file_modif, file_size, "file")
-    return {file_name: file_entry}
 
 def _prune_compendia_files(file_list: list[FileEntry]) ->\
     tuple[tuple[str, ...], dict[str, FileEntry]]:
@@ -712,9 +734,11 @@ def _prune_compendia_files(file_list: list[FileEntry]) ->\
             if file_name.endswith(FILE_NAME_SUFFIX_START_NUMBERED):
                 file_name_start_numbered_ind = \
                     file_name.find(FILE_NAME_SUFFIX_START_NUMBERED)
-                file_name_prefix = \
-                    file_name[0:file_name_start_numbered_ind]
-                use_names.remove(file_name_prefix + COMPENDIA_FILE_SUFFIX)
+                file_name_prefix = file_name[0:file_name_start_numbered_ind]
+                base_name = file_name_prefix + COMPENDIA_FILE_SUFFIX
+                # base file not guarenteed to have been added yet
+                if base_name in use_names:
+                    use_names.remove(base_name)
             use_names.append(file_name)
         else:
             print(f"Warning: unrecognized file name {file_name}",
@@ -732,17 +756,14 @@ def _prune_conflation_files(file_list: list[FileEntry]) ->\
              tuple(zip(*pairs)) if pairs else ((), ()))
     return name_tuple, dict(zip(name_tuple, entry_tuple))
 
-def _get_compendia_files(compendia_files_index_url: str) ->\
+def _get_compendia_files(compend_files_index_url: str) ->\
         tuple[tuple[str, ...], dict[str, FileEntry]]:
-    compendia_listing: list[FileEntry]
-    _, compendia_listing = fetch_listing(compendia_files_index_url)
-    compendia_pruned_files, compendia_map_names = \
-        _prune_compendia_files(compendia_listing)
-    # need to ingest OrganismTaxon compendia file first
-    compendia_sorted_files = \
-        sorted(compendia_pruned_files,
-               key=lambda file_name: 0 if file_name == TAXON_FILE else 1)
-    return tuple(compendia_sorted_files), compendia_map_names
+    compend_listing: list[FileEntry]   # ingest OrganismTaxon compendia file first
+    _, compend_listing = fetch_listing(compend_files_index_url)
+    compend_pruned_files, compend_map_names = _prune_compendia_files(compend_listing)
+    compend_sorted_files = sorted(compend_pruned_files,
+                                  key=lambda fname: 0 if fname == TAXON_FILE else 1)
+    return tuple(compend_sorted_files), compend_map_names
 
 def _get_conflation_files(conflation_files_index_url: str) ->\
         tuple[tuple[str, ...], dict[str, FileEntry]]:
@@ -755,11 +776,8 @@ def _get_conflation_files(conflation_files_index_url: str) ->\
 def _set_pragmas_for_ingestion(conn: sqlite3.Connection,
                                wal_size: int,
                                cache_size: int):
-    for s in ('synchronous = OFF',
-              'journal_mode = WAL',
-              'temp_store = MEMORY',
-              f'cache_size = {cache_size}',
-              f'wal_autocheckpoint = {wal_size}'):
+    for s in ('synchronous = OFF', 'journal_mode = WAL', 'temp_store = MEMORY',
+              f'cache_size = {cache_size}', f'wal_autocheckpoint = {wal_size}'):
         conn.execute(f"PRAGMA {s}")
         _log_print(f"setting PRAGMA {s}")
 
@@ -805,8 +823,7 @@ def _do_final_cleanup(conn: sqlite3.Connection,
         _log_print(f"Finished database ingest. "
                    f"Total elapsed time: {elapsed_time_str} (HHH:MM::SS)")
 
-def _initialize_ray():
-    # initialize Ray after any changes to tmp dir location
+def _initialize_ray():  # initialize Ray after any changes to tmp dir location
     logging.getLogger("ray").setLevel(logging.ERROR)
     ray.init(logging_level=logging.ERROR)
 
@@ -815,21 +832,12 @@ def _customize_temp_dir(temp_dir: str,
                         quiet: bool):
     os.environ["SQLITE_TMPDIR"] = temp_dir
     if not no_exec:
-        python_exe = sys.executable
-        new_args = [python_exe, "-u", sys.argv[0], *sys.argv[1:], "--no-exec"]
-        os.execve(python_exe, new_args, os.environ.copy())
+        new_args = [sys.executable, "-u", sys.argv[0], *sys.argv[1:], "--no-exec"]
+        os.execve(sys.executable, new_args, os.environ.copy())
     os.environ["RAY_TMPDIR"] = temp_dir
-    # the "noqa" is to quiet a Vulture warning and not upset "ruff"
     tempfile.tempdir = temp_dir  # noqa
     if not quiet:
         _log_print(f"Setting temp dir to: {temp_dir}")
-
-def _log_start_of_file(start: float, filetype: str, filename: str, filesize: int):
-    elapsed = su.format_time_seconds_to_str(time.time() - start)
-    return (f"at elapsed time: {elapsed}; "
-            f"starting ingest of {filetype} "
-            f"file: {filename}; "
-            f"file size: {filesize} bytes")
 
 def _get_conflation_type_id(file_to_id_map: dict[str, int],
                             conflation_file_name: str) -> int:
@@ -845,31 +853,26 @@ def _get_make_chunkproc_args_conflation(file_to_id_map: dict[str, int],
                                         file_name: str) -> dict[str, Any]:
     return {'conflation_type_id': _get_conflation_type_id(file_to_id_map, file_name)}
 
-def _get_make_chunkproc_args_compendia(insrt_missing_taxa: bool,
+def _get_make_chunkproc_args_compendia(insrt_msng_taxa: bool,
                                        file_name:str) -> dict[str, Any]:
-    # In Babel, the umls.txt file has a different key order than the
-    # other compendia files; need to handle "umls.txt" as a special case
+    # Babel's umls.txt file has a different key order than other compendia files
     non_umls_compendia_file = file_name != 'umls.txt'
-    return {'insrt_missing_taxa': insrt_missing_taxa,
+    return {'insrt_msng_taxa': insrt_msng_taxa,
             'non_umls_compendia_file': non_umls_compendia_file}
 
 def _make_ingest_urls(dry_run: bool) -> Callable:
     # pylint: disable=too-many-arguments,too-many-positional-arguments
-    def ingest_urls(file_names: Iterable[str],
-                    file_map: dict[str, FileEntry],
-                    file_type: str,
-                    base_url: str,
-                    ingest_url: Callable,
-                    start_time_sec: float,
-                    make_chunk_processor: Callable,
-                    get_make_chunk_processor_args: Callable,
-                    glbl_chnk_cnt: int) -> int:
+    def ingest_urls(
+            file_names: Iterable[str], file_map: dict[str, FileEntry], file_type: str,
+            base_url: str, ingest_url: Callable, start_time_sec: float,
+            make_chunk_processor: Callable, get_make_chunk_processor_args: Callable,
+            glbl_chnk_cnt: int) -> int:
         _log_print(f"ingesting {file_type} files at: " +
                    (base_url if base_url != "" else "(local)"))
         for file_name in file_names:
             file_size = file_map[file_name].size
-            elapsed_str = _log_start_of_file(start_time_sec, file_type,
-                                             file_name, file_size)
+            elapsed_str = su.log_start_of_file(start_time_sec, file_type,
+                                               file_name, file_size)
             _log_print(elapsed_str)
             if not dry_run:
                 make_chunk_processor_args = get_make_chunk_processor_args(file_name)
@@ -880,10 +883,9 @@ def _make_ingest_urls(dry_run: bool) -> Callable:
         return glbl_chnk_cnt
     return ingest_urls
 
-def _make_get_make_chunkproc_args_compendia(insrt_missing_taxa: bool) -> \
-        Callable:
+def _make_get_make_chunkproc_args_compendia(insrt_msng_taxa: bool) -> Callable:
     return functools.partial(_get_make_chunkproc_args_compendia,
-                             insrt_missing_taxa)
+                             insrt_msng_taxa)
 
 # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements
 def _main_args(babel_compendia_url: str,
@@ -899,8 +901,7 @@ def _main_args(babel_compendia_url: str,
                temp_dir: str,
                no_exec: bool):
     log_work = not quiet
-    # handle redefining _log_print first, in case any other function uses it
-    _set_log_print_enabled(log_work)
+    _set_log_print_enabled(log_work)  # redefine _log_print first
     if temp_dir is not None:
         _customize_temp_dir(temp_dir, no_exec, quiet)
     if test_type is not None and test_type == 1 and test_compendia_file is None:
@@ -947,7 +948,7 @@ def _main_args(babel_compendia_url: str,
              "start_time_sec": start_time_sec,
              "make_chunk_processor": make_compendia_chunk_processor,
              "get_make_chunk_processor_args":
-             _make_get_make_chunkproc_args_compendia(insrt_missing_taxa=True),
+             _make_get_make_chunkproc_args_compendia(insrt_msng_taxa=True),
              "glbl_chnk_cnt": glbl_chnk_cnt}
         ingest_args_conflation = \
             {"file_names": conflation_sorted_files,
@@ -965,7 +966,7 @@ def _main_args(babel_compendia_url: str,
             ingest_args_compendia.update({
                 "file_names": (test_compendia_file,),
                 "base_url": "",
-                "file_map": _create_file_map(test_compendia_file)})
+                "file_map": su.create_file_map(test_compendia_file)})
             glbl_chnk_cnt = ingest_urls(**ingest_args_compendia)
         elif test_type == 2:
             ingest_args_compendia.update({
@@ -975,7 +976,7 @@ def _main_args(babel_compendia_url: str,
             ingest_args_compendia.update({
                 "file_names": TEST_3_COMPENDIA,
                 "get_make_chunk_processor_args":
-                _make_get_make_chunkproc_args_compendia(insrt_missing_taxa=False)})
+                _make_get_make_chunkproc_args_compendia(insrt_msng_taxa=False)})
             glbl_chnk_cnt = ingest_urls(**ingest_args_compendia)
             ingest_args_conflation.update({
                 "file_names": TEST_3_CONFLATION,
@@ -990,8 +991,7 @@ def _main_args(babel_compendia_url: str,
             ingest_args_conflation.update({"glbl_chnk_cnt": glbl_chnk_cnt})
             glbl_chnk_cnt = ingest_urls(**ingest_args_conflation)
         else:
-            assert False, f"invalid test_type: {test_type}; " \
-                          "must be one of 1, 2, 3, or None"
+            assert False, f"invalid test_type: {test_type}"
         _do_final_cleanup(conn, log_work, glbl_chnk_cnt, start_time_sec)
 
 def _main():
