@@ -447,7 +447,8 @@ INNER JOIN identifiers as sec_identif on idcl.identifier_id = sec_identif.id
 INNER JOIN types on cliques.type_id = types.id
 LEFT JOIN identifiers_descriptions as idd ON idd.identifier_id = prim_identif.id
 LEFT JOIN descriptions AS descrip ON descrip.id = idd.description_id
-WHERE sec_identif.curie = ?;"""  # noqa W291
+WHERE sec_identif.curie = ?
+ORDER BY cliques.id ASC, prim_identif.curie ASC;"""  # noqa W291
     rows = conn.execute(s, (curie,)).fetchall()
     return tuple({'id': {'identifier': row[0],
                          'description': row[3],
@@ -612,3 +613,80 @@ def get_taxon_for_gene_or_protein(conn: sqlite3.Connection,
     WHERE id1.curie = ?;
     """, (curie, )).fetchone()
     return row[0] if row else None
+
+def get_all_names_for_curie(conn: sqlite3.Connection,
+                            curie: str) -> tuple[str, ...]:
+    """Return every non-empty name associated with the CURIE."""
+    query = """
+WITH target_identifier AS (
+    SELECT id, label
+    FROM identifiers
+    WHERE curie = ?
+),
+target_cliques AS (
+    SELECT c.id AS clique_id
+    FROM cliques AS c
+    JOIN target_identifier ti ON c.primary_identifier_id = ti.id
+    UNION
+    SELECT ic.clique_id
+    FROM identifiers_cliques AS ic
+    JOIN target_identifier ti ON ic.identifier_id = ti.id
+)
+SELECT DISTINCT name
+FROM (
+    SELECT ti.label AS name
+    FROM target_identifier AS ti
+    UNION ALL
+    SELECT c.preferred_name AS name
+    FROM cliques AS c
+    JOIN target_cliques AS tc ON tc.clique_id = c.id
+    UNION ALL
+    SELECT other.label AS name
+    FROM target_cliques AS tc
+    JOIN identifiers_cliques AS ic ON ic.clique_id = tc.clique_id
+    JOIN identifiers AS other ON other.id = ic.identifier_id
+) AS collected_names
+WHERE name IS NOT NULL AND TRIM(name) <> ''
+ORDER BY name COLLATE NOCASE;
+    """
+    rows = conn.cursor().execute(query, (curie,)).fetchall()
+    return tuple(row[0] for row in rows)
+
+def get_categories_for_curie(conn: sqlite3.Connection,
+                             curie: str) -> tuple[str, ...]:
+    """Return every category (type CURIE) associated with the CURIE."""
+    query = """
+WITH target_identifier AS (
+    SELECT id
+    FROM identifiers
+    WHERE curie = ?
+),
+related_identifiers AS (
+    SELECT id
+    FROM target_identifier
+    UNION
+    SELECT cm.identifier_id
+    FROM conflation_members AS cm
+    WHERE cm.cluster_id IN (
+        SELECT cluster_id
+        FROM conflation_members
+        WHERE identifier_id IN (SELECT id FROM target_identifier)
+    )
+),
+target_cliques AS (
+    SELECT c.id AS clique_id
+    FROM cliques AS c
+    JOIN related_identifiers ri ON c.primary_identifier_id = ri.id
+    UNION
+    SELECT ic.clique_id
+    FROM identifiers_cliques AS ic
+    JOIN related_identifiers ri ON ic.identifier_id = ri.id
+)
+SELECT DISTINCT types.curie
+FROM target_cliques AS tc
+JOIN cliques AS c ON c.id = tc.clique_id
+JOIN types ON types.id = c.type_id
+ORDER BY types.curie COLLATE NOCASE;
+    """
+    rows = conn.cursor().execute(query, (curie,)).fetchall()
+    return tuple(row[0] for row in rows)

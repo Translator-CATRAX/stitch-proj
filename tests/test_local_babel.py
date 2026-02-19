@@ -14,6 +14,8 @@ from stitch.local_babel import (
     map_curies_to_preferred_curies,
     map_pref_curie_to_synonyms,
     map_preferred_curie_to_cliques,
+    get_all_names_for_curie,
+    get_categories_for_curie,
 )
 
 
@@ -138,3 +140,62 @@ def test_map_chembl(readonly_conn: sqlite3.Connection):
     assert res == (('CHEMBL.COMPOUND:CHEMBL339829',
                     'biolink:ChemicalEntity',
                     'CHEMBL.COMPOUND:CHEMBL339829'),)
+
+
+def _is_case_insensitive_sorted(t: tuple[str, ...]) -> bool:
+    return list(t) == sorted(t, key=str.casefold)
+
+
+def test_get_all_names_for_curie(readonly_conn: sqlite3.Connection):
+    # Known-good CURIE from your other tests
+    curie = "CHEBI:15377"
+
+    names = get_all_names_for_curie(readonly_conn, curie)
+
+    assert isinstance(names, tuple)
+    assert len(names) > 0
+    assert all(isinstance(x, str) for x in names)
+    assert all(x.strip() != "" for x in names)  # non-empty, non-whitespace
+    assert len(names) == len(set(names))  # DISTINCT in SQL
+
+    # ORDER BY name COLLATE NOCASE
+    assert _is_case_insensitive_sorted(names)
+
+    # The identifier table label is included (the query always unions ti.label)
+    # We don't hardcode the actual label string (db can change), just assert it’s present.
+    label_row = readonly_conn.cursor().execute(
+        "SELECT label FROM identifiers WHERE curie = ?",
+        (curie,),
+    ).fetchone()
+    assert label_row is not None
+    label = label_row[0]
+    assert isinstance(label, str)
+    assert label.strip() != ""
+    assert label in names
+
+    # Unknown CURIE => empty tuple
+    missing = get_all_names_for_curie(readonly_conn, "XYZZY:does_not_exist")
+    assert missing == ()
+
+
+def test_get_categories_for_curie(readonly_conn: sqlite3.Connection):
+    # Unknown CURIE => empty
+    missing = get_categories_for_curie(readonly_conn, "XYZZY:does_not_exist")
+    assert missing == ()
+
+    # A known CURIE from your existing tests
+    curie = "MESH:D014867"
+    cats = get_categories_for_curie(readonly_conn, curie)
+
+    assert isinstance(cats, tuple)
+    assert len(cats) > 0
+    assert all(isinstance(x, str) for x in cats)
+    assert all(x.strip() != "" for x in cats)
+    assert len(cats) == len(set(cats))  # DISTINCT in SQL
+    assert _is_case_insensitive_sorted(cats)
+
+    # Sanity: these are type CURIEs and should look like CURIEs (contain ":")
+    assert all(":" in x for x in cats)
+
+    # Optional but useful: conflation can expand categories.
+    # In your tests, RXCUI:1014098 participates in DrugChemical con
