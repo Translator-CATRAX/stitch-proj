@@ -40,10 +40,13 @@ import random
 import sqlite3
 from typing import Callable, Iterable, Optional, TypeAlias, TypedDict, TypeVar
 
+import stitch.stitchutils as su
+
 # define the type aliases that we need for brevity
 MultProcPool: TypeAlias = multiprocessing.pool.Pool
 CurieCurieAndType: TypeAlias = tuple[str, str, str]
-CurieCurieAndInt: TypeAlias = tuple[str, str, int]
+CurieCurieAndIntInt: TypeAlias = tuple[str, str, int, int]
+CurieInt: TypeAlias = tuple[str, int]
 
 T = TypeVar("T")
 R = TypeVar("R")
@@ -184,51 +187,47 @@ def connect_to_db_read_only(db_filename: str) -> sqlite3.Connection:
     return conn
 
 def _map_curies_to_conflation_curies(db_filename: str,
-                                     curie_batch: Iterable[str]) -> \
-                                     tuple[CurieCurieAndInt, ...]:
+                                    curie_batch: Iterable[str]) -> \
+                                    tuple[CurieCurieAndIntInt, ...]:
     """Resolve a batch of CURIEs to their conflation-cluster neighbors.
 
-    For each input CURIE, returns other CURIEs in the same conflation cluster,
-    along with the cluster's type id.
+    For each input CURIE, returns CURIEs in the same conflation cluster(s),
+    along with each member's is_canonical and the cluster's type id.
 
-    Parameters
-    ----------
-    db_filename : str
-        Path to the SQLite database.
-    curie_batch : Iterable[str]
-        Batch of CURIE strings to resolve.
-
-    Returns
-    -------
-    tuple[CurieCurieAndInt, ...]
-        Triples of `(query_curie, neighbor_curie, conflation_type_id)`.
+    Returns tuples: (query_curie, member_curie, member_is_canonical, conflation_type_id)
     """
     s = """
-SELECT id2.curie, id1.curie, conflation_clusters.type
-FROM identifiers AS id1
-INNER JOIN conflation_members AS cm1
-ON cm1.identifier_id = id1.id
-INNER JOIN conflation_members AS cm2
-ON cm2.cluster_id = cm1.cluster_id
-INNER JOIN identifiers AS id2
-ON id2.id = cm2.identifier_id
-INNER JOIN conflation_clusters
-ON cm2.cluster_id = conflation_clusters.id
-WHERE id2.curie = ?
-AND id1.curie <> id2.curie;
-    """ # noqa W291
+SELECT ? AS query_curie,
+       id1.curie AS member_curie,
+       cm1.is_canonical AS member_is_canonical,
+       cc.type AS conflation_type_id
+FROM conflation_clusters AS cc
+JOIN conflation_members AS cm1
+  ON cm1.cluster_id = cc.id
+JOIN identifiers AS id1
+  ON id1.id = cm1.identifier_id
+WHERE cm1.cluster_id IN (
+    SELECT cm2.cluster_id
+    FROM conflation_members AS cm2
+    JOIN identifiers AS id2
+      ON id2.id = cm2.identifier_id
+    WHERE id2.curie = ?
+);
+    """  # noqa W291
+
     with connect_to_db_read_only(db_filename) as db_conn:
         cursor = db_conn.cursor()
-        res = tuple((row[0], row[1], row[2])
-                    for curie in curie_batch
-                    for row in cursor.execute(s, (curie,)).fetchall())
+        res = tuple(
+            (row[0], row[1], row[2], row[3])
+            for curie in curie_batch
+            for row in cursor.execute(s, (curie, curie)).fetchall()
+        )
     return res
-
 
 def map_curies_to_conflation_curies(db_filename: str,
                                     curies: tuple[str, ...],
                                     pool: Optional[MultProcPool] = None) -> \
-                                    tuple[CurieCurieAndInt, ...]:
+                                    tuple[CurieCurieAndIntInt, ...]:
     """Resolve many CURIEs to conflation neighbors, optionally in parallel.
 
     Parameters
@@ -242,7 +241,7 @@ def map_curies_to_conflation_curies(db_filename: str,
 
     Returns
     -------
-    tuple[CurieCurieAndInt, ...]
+    tuple[CurieCurieAndIntInt, ...]
         Triples of `(query_curie, neighbor_curie, conflation_type_id)`.
     """
     processor = functools.partial(_map_curies_to_conflation_curies,
@@ -250,9 +249,11 @@ def map_curies_to_conflation_curies(db_filename: str,
     return _map_with_batching(curies, processor, pool)
 
 
-def map_curie_to_conflation_curies(conn: sqlite3.Connection,
-                                   curie: str,
-                                   conflation_type: int) -> tuple[str]:
+def map_curie_to_conflation_curies(
+        conn: sqlite3.Connection,
+        curie: str,
+        conflation_type: Optional[str] = None
+) -> tuple[CurieInt, ...]:
     """Return CURIEs conflated with `curie` filtered by `conflation_type`.
 
     Parameters
@@ -261,31 +262,42 @@ def map_curie_to_conflation_curies(conn: sqlite3.Connection,
         Open database connection.
     curie : str
         The reference CURIE.
-    conflation_type : int
-        Conflation type id used to filter clusters.
+    conflation_type : Optional[str]
+        Conflation type to select for (`DrugChemical` or `GeneProtein`)
 
     Returns
     -------
-    tuple[str]
+    tuple[CurieInt, ...]
         Neighbor CURIEs within conflation clusters of the given type.
     """
-    s = """
-SELECT id1.curie
-FROM identifiers AS id1
-INNER JOIN conflation_members AS cm1
-ON cm1.identifier_id = id1.id
-INNER JOIN conflation_members AS cm2
-ON cm2.cluster_id = cm1.cluster_id
-INNER JOIN identifiers AS id2
-ON id2.id = cm2.identifier_id
-INNER JOIN conflation_clusters
-ON cm2.cluster_id = conflation_clusters.id
-WHERE conflation_clusters.type = ?
-AND id2.curie = ?
-AND id1.curie <> id2.curie;
+    query_data: tuple[str]|tuple[int, str]
+    if conflation_type is not None:
+        if conflation_type not in su.CONFLATION_TYPE_NAMES_IDS:
+            raise ValueError(f"invalid conflation type name: {conflation_type}")
+        conflation_type_int = su.CONFLATION_TYPE_NAMES_IDS[conflation_type]
+        conflation_type_query_str = "cc.type = ? AND "
+        query_data = (conflation_type_int, curie)
+    else:
+        conflation_type_query_str = ""
+        query_data = (curie, )
+    s = f"""
+    SELECT id1.curie, cm1.is_canonical
+FROM conflation_clusters AS cc
+JOIN conflation_members AS cm1
+  ON cm1.cluster_id = cc.id
+JOIN identifiers AS id1
+  ON id1.id = cm1.identifier_id
+WHERE {conflation_type_query_str}
+    cm1.cluster_id IN (
+      SELECT cm2.cluster_id
+      FROM conflation_members AS cm2
+      JOIN identifiers AS id2
+        ON id2.id = cm2.identifier_id
+      WHERE id2.curie = ?
+  );
     """ # noqa W291
-    res = conn.cursor().execute(s, (conflation_type, curie)).fetchall()
-    return tuple(row[0] for row in res)
+    res = conn.cursor().execute(s, query_data).fetchall()
+    return tuple((row[0], row[1]) for row in res)
 
 def _map_curies_to_preferred_curies(db_filename: str,
                                     curie_batch: Iterable[str]) -> \
