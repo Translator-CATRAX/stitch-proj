@@ -19,7 +19,7 @@ from stitch.local_babel import (
 
 @pytest.fixture(scope="session")
 def db_filename() -> str:
-    return "db/babel-20250901.sqlite"
+    return "db/babel-20250901-p1.sqlite"
 
 @pytest.fixture(scope="function")
 def pool():
@@ -89,9 +89,11 @@ def test_map_curies_to_preferred_curies_big(db_filename: str):
     assert len(unique_ids_mapped) <= len(curies)
 
 def test_map_curie_to_conflation_curies(readonly_conn: sqlite3.Connection):
-    curies = map_curie_to_conflation_curies(readonly_conn, "RXCUI:1014098", 1)
+    curies = map_curie_to_conflation_curies(readonly_conn,
+                                            "RXCUI:1014098", 'DrugChemical')
     assert len(curies) >= 14
-    curies = map_curie_to_conflation_curies(readonly_conn, "XYZZY:533234", 1)
+    curies = map_curie_to_conflation_curies(readonly_conn,
+                                            "XYZZY:533234", 'DrugChemical')
     assert not curies
 
 def test_map_curies_to_conflation_curies(db_filename: str):

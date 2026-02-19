@@ -52,13 +52,17 @@ way.
 """
 import argparse
 import itertools
+import os
 import tempfile
+import time
 import urllib
+from datetime import datetime
 from typing import Any, Iterable, Iterator, TypeVar, Union, cast
 
 import bmt
 import numpy as np
 import requests
+from htmllistparse.htmllistparse import FileEntry, fetch_listing
 
 CONFLATION_TYPE_NAMES_IDS = \
     {'DrugChemical': 1,
@@ -299,3 +303,34 @@ def get_line_chunks_from_url(url: str, chunk_size: int) -> Iterable[list[str]]:
     """
     lines = get_lines_from_url(url)
     return chunked(lines, chunk_size)
+
+def log_start_of_file(start: float, filetype: str, filename: str, filesize: int):
+    elapsed = format_time_seconds_to_str(time.time() - start)
+    return (f"at elapsed time: {elapsed}; "
+            f"starting ingest of {filetype} "
+            f"file: {filename}; "
+            f"file size: {filesize} bytes")
+
+def create_file_map(file_name: str) -> dict[str, FileEntry]:
+    file_size = os.path.getsize(file_name)
+    file_modif = os.path.getmtime(file_name)
+    file_entry = FileEntry(file_name, file_modif, file_size, "file")
+    return {file_name: file_entry}
+
+def merge_ints_to_str(t: Iterable[int], delim: str) -> str:
+    return delim.join(map(str, t))
+
+def validate_curie_list(curie_list: list[str]) -> None:
+    if not isinstance(curie_list, (list, tuple)):
+        raise ValueError("expected list/tuple")
+    if not all(isinstance(x, str) for x in curie_list):
+        raise ValueError("expected all strings")
+    if not curie_list:
+        raise ValueError("empty curie_list")
+
+def _cur_datetime_local_no_ms() -> datetime:  # does not return microseconds
+    return datetime.now().astimezone().replace(microsecond=0)
+
+def cur_datetime_local_str() -> str:
+    return _cur_datetime_local_no_ms().isoformat()
+

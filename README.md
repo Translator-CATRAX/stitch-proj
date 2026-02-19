@@ -137,13 +137,16 @@ configuring `ingest_babel.py` to use that temp dir (and ensuring that the final
 output Babel sqlite file goes into the same filesystem).
 
 # Downloading a pre-built Babel sqlite database file
-[`babel-20250331.sqlite`](https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250331.sqlite)
-(173 GiB) is available for download from AWS S3.  For details and an MD5
+[`babel-20250331-p1.sqlite`](https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250331-p1.sqlite)
+(181.6 GiB) is available for download from AWS S3.  For details and an MD5
 checksum hash, see the (Releases
 page)[https://github.com/Translator-CATRAX/stitch-proj/releases] for the stich
 project. You will need to download (or, alternatively, build from scratch using
 `ingest_babel.py`) this file in order to be able to run the unit test 
-suite.
+suite. The "-p1" on the downloadable sqlite database indicates that
+the database has been patched once, to add the `is_canonical` column
+to the `conflation_members` table 
+(see [stitch-proj issue 80](https://github.com/Translator-CATRAX/stitch-proj/issues/80)).
 
 # The local Babel sqlite database schema
 This schema diagram was generated using [DbVisualizer](https://www.dbvis.com) Free version 24.3.3.
@@ -230,7 +233,7 @@ FAILED tests/test_stitchutils.py::test_get_biolink_categories - urllib.error.URL
 # How to run just the unit test suite
 First, you need to make sure that underneath the top-level
 "stich" directory, there is a subdirectory "db" containing 
-the `babel-20250901.sqlite` file (see section 
+the `babel-20250901-p1.sqlite` file (see section 
 "Downloading a pre-built Babel sqlite database file").
 Then you can run the unit test suite, like this:
 ```
