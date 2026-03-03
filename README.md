@@ -1,5 +1,5 @@
 # stitch-proj
-Some tools for building a Translator BigKG. This software project is experimental and unfinished.
+Tools for ingesting and querying the [Babel concept identifier normalization database](https://github.com/TranslatorSRI/Babel)  as a local sqlite database.
 
 # Introduction 
 There are two types of intended users for the `stitch-proj` software: someone who is
