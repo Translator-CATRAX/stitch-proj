@@ -90,7 +90,7 @@ without manipulating the PYTHONPATH, no matter what the current working
 directory is. You will need this in order for the unit test module
 `tests/test_ingest_babel.py` to run successfully.
 
-# How to run the `stich-proj` Babel sqlite ingest in AWS
+# How to run the `stitch-proj` Babel sqlite ingest in AWS
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
 - `cd stitch-proj`
 - `screen` (to enter a screen session)
@@ -140,7 +140,7 @@ output Babel sqlite file goes into the same filesystem).
 [`babel-20250331-p1.sqlite`](https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250331-p1.sqlite)
 (181.6 GiB) is available for download from AWS S3.  For details and an MD5
 checksum hash, see the (Releases
-page)[https://github.com/Translator-CATRAX/stitch-proj/releases] for the stich
+page)[https://github.com/Translator-CATRAX/stitch-proj/releases] for the stitch
 project. You will need to download (or, alternatively, build from scratch using
 `ingest_babel.py`) this file in order to be able to run the unit test 
 suite. The "-p1" on the downloadable sqlite database indicates that
@@ -232,7 +232,7 @@ FAILED tests/test_stitchutils.py::test_get_biolink_categories - urllib.error.URL
 
 # How to run just the unit test suite
 First, you need to make sure that underneath the top-level
-"stich" directory, there is a subdirectory "db" containing 
+"stitch" directory, there is a subdirectory "db" containing 
 the `babel-20250901-p1.sqlite` file (see section 
 "Downloading a pre-built Babel sqlite database file").
 Then you can run the unit test suite, like this:
