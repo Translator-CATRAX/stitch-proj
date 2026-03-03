@@ -73,7 +73,7 @@ database from scratch, the PyPI packages `pandas`, `ray`, and
 `htmllistparse` are needed. The `requirements.txt` file contains
 the full set of dependencies.
 
-# Setup of a python virtualenv for using the `stich` software
+# Setup of a python virtualenv for using the `stitch` software
 You can just run
 ```
 cd stitch-proj
