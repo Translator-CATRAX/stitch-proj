@@ -1,5 +1,5 @@
 # stitch-proj
-Some tools for building a Translator BigKG. This software project is experimental and unfinished.
+Tools for ingesting and querying the [Babel concept identifier normalization database](https://github.com/TranslatorSRI/Babel)  as a local sqlite database.
 
 # Introduction 
 There are two types of intended users for the `stitch-proj` software: someone who is
@@ -59,6 +59,276 @@ the Graviton3 processor. I've tested on the following MacOS system:
 - Apple SSD AP2048R Media SSD (2 TiB)
 - `python3.12` installed via Homebrew
 - `openblas` installed via Homebrew
+
+# stitch-proj
+
+`stitch-proj` is available on PyPI and requires **Python 3.12 or newer**.
+
+## Installation
+
+### Standard Usage
+
+Install from PyPI:
+
+```bash
+pip install stitch-proj
+```
+
+Import in your project:
+
+```python
+import stitch_proj.local_babel as lb
+```
+
+The following core dependencies are installed automatically:
+
+- bmt >= 1.4.5  
+- requests >= 2.32.5  
+- pandas >= 2.2.3  
+- ray >= 2.43.0  
+- htmllistparse >= 0.6.1  
+
+---
+
+### Development Installation
+
+For development work, install with:
+
+```bash
+pip install stitch-proj[dev]
+```
+
+This includes additional development tools:
+
+- pytest >= 8.3.5  
+- mypy >= 1.15.0  
+- ruff >= 0.11.12  
+- pylint >= 3.3.8  
+- vulture >= 2.14  
+- pandas-stubs  
+- types-requests  
+- pipreqs  
+
+# Packaging Process for `stitch-proj`
+
+This section describes the complete process used to package and publish `stitch-proj` to PyPI.
+
+---
+
+## 1. Project Structure
+
+The project uses a `src/` layout, which is the recommended modern packaging structure:
+
+```
+stitch-core/
+├── pyproject.toml
+├── README.md
+├── LICENSE
+├── src/
+│   └── stitch_proj/
+│       ├── __init__.py
+│       ├── ingest_babel.py
+│       ├── local_babel.py
+│       ├── row_counts.py
+│       └── stitchutils.py
+├── tests/
+└── dist/
+```
+
+Key points:
+
+- All importable code lives under `src/stitch_proj/`
+- Tests are outside the package
+- Distribution artifacts are generated into `dist/`
+- Metadata and build configuration live in `pyproject.toml`
+
+---
+
+## 2. pyproject.toml Configuration
+
+Packaging is defined entirely in `pyproject.toml` (PEP 517/518/621 compliant).
+
+It specifies:
+
+- Build system (`setuptools`, `wheel`)
+- Project name
+- Version
+- Description
+- Authors
+- License
+- Python version requirement (>= 3.12)
+- Dependencies
+- Optional development dependencies
+- Package discovery via `src`
+
+Example critical sections:
+
+```toml
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stitch-proj"
+version = "0.1.0"
+authors = [
+  { name="First Last", email="example@example.com" },
+]
+
+maintainers = [
+  { name="First Last", email="example@example.com" },
+]
+
+description = "the description for the package. Should be just a few sentencees"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Development Status :: 3 - Alpha",
+]
+
+dependencies = [
+ list general dependencies, everyone will need to run the app here
+]
+
+[project.optional-dependencies]
+dev = [
+list dependencies only devs will need to run the app here
+]
+
+[project.urls]
+Homepage = "github repository where the code for this package lives"
+Issues = "where issues should be documented"
+
+[project.scripts]
+ingest-babel = "stitch_proj.ingest_babel:_main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["stitch_proj*"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
+ignore = []
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+```
+
+---
+
+## 3. Install Build Tools
+
+Before building:
+
+```bash
+python -m pip install --upgrade build twine
+```
+
+- `build` generates distributions
+- `twine` uploads to PyPI
+
+---
+
+## 4. Build the Package
+
+From the project root:
+
+```bash
+python -m build
+```
+
+This generates:
+
+```
+dist/
+├── stitch_proj-0.1.0-py3-none-any.whl
+└── stitch_proj-0.1.0.tar.gz
+```
+
+Artifacts:
+
+- `.whl` → wheel (binary distribution)
+- `.tar.gz` → source distribution (sdist)
+
+---
+
+## 5. Verify the Package
+
+Optional but recommended:
+
+```bash
+twine check dist/*
+```
+
+This validates metadata and README rendering.
+
+---
+
+## 6. Upload to PyPI
+
+To upload to PyPI:
+
+```bash
+twine upload dist/*
+```
+
+You must have:
+
+- A PyPI account
+- An API token configured (recommended)
+
+Example using token:
+
+```bash
+twine upload -u __token__ -p <your-token> dist/*
+```
+
+---
+
+## 7. Install From PyPI
+
+After upload:
+
+```bash
+pip install stitch-proj
+```
+
+Or for development:
+
+```bash
+pip install stitch-proj[dev]
+```
+
+---
+
+## 8. Versioning Workflow
+
+When releasing a new version:
+
+1. Update version in `pyproject.toml`
+2. Remove old build artifacts:
+   ```bash
+   rm -rf dist/ build/ src/*.egg-info
+   ```
+3. Rebuild:
+   ```bash
+   python -m build
+   ```
+4. Upload:
+   ```bash
+   twine upload dist/*
+   ```
+
+---
+
 
 # Python distribution package requirements 
 All external PyPI distribution package requirements for the `stitch-proj` project are listed in the
