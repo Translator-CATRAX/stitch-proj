@@ -32,7 +32,6 @@ Example:
 """
 import argparse
 import pprint
-import sqlite3
 
 from stitch import local_babel
 from stitch import stitchutils as su
@@ -50,7 +49,7 @@ def _get_args() -> argparse.Namespace:
     return arg_parser.parse_args()
 
 def _main(filename: str):
-    with sqlite3.connect(f"file:{filename}?mode=ro", uri=True) as conn:
+    with local_babel.connect_to_db_read_only(filename) as conn:
         pprint.pprint(local_babel.get_table_row_counts(conn))
 
 if __name__ == "__main__":
