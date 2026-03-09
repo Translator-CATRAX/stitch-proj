@@ -50,7 +50,7 @@ def _get_args() -> argparse.Namespace:
     return arg_parser.parse_args()
 
 def _main(filename: str):
-    with sqlite3.Connection(filename) as conn:
+    with sqlite3.connect(f"file:{filename}?mode=ro", uri=True) as conn:
         pprint.pprint(local_babel.get_table_row_counts(conn))
 
 if __name__ == "__main__":
