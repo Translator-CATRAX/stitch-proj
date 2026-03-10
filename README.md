@@ -107,7 +107,6 @@ This includes additional development tools:
 - vulture >= 2.14  
 - pandas-stubs  
 - types-requests  
-- pipreqs  
 
 # Packaging Process for `stitch-proj`
 
