@@ -10,7 +10,7 @@ STITCH_SQLITE_FILE=${STITCH_DIR}/babel.sqlite
 BABEL_BASE_URL=https://stars.renci.org/var/babel_outputs/2025mar31
 BABEL_COMPENDIA_BASE_URL=${BABEL_BASE_URL}/compendia/
 BABEL_CONFLATION_BASE_URL=${BABEL_BASE_URL}/conflation/
-INGEST_BABEL_CMD=${STITCH_DIR}/venv/bin/ingest-babel
+INGEST_BABEL_CMD=ingest-babel
 
 rm -f ${STITCH_LOG_FILE}
 
