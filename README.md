@@ -526,6 +526,7 @@ conflation files, which they load remotely via HTTPS). To run the
 tests:
 ```
 cd stitch-proj
+source venv/bin/activate
 ./run-integration-tests.sh
 ```
 
