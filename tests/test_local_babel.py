@@ -199,3 +199,55 @@ def test_get_categories_for_curie(readonly_conn: sqlite3.Connection):
 
     # Optional but useful: conflation can expand categories.
     # In your tests, RXCUI:1014098 participates in DrugChemical con
+
+
+def test_map_any_curie_to_cliques_ordering(readonly_conn: sqlite3.Connection):
+    curie = "MESH:D014867"
+    results = map_any_curie_to_cliques(readonly_conn, curie)
+    assert isinstance(results, tuple)
+    assert len(results) > 0
+    identifiers = [r['id']['identifier'] for r in results]
+    assert identifiers == sorted(identifiers), (
+        f"Results should be sorted by identifier, got: {identifiers}"
+    )
+    results_again = map_any_curie_to_cliques(readonly_conn, curie)
+    assert results == results_again, "Results should be identical across repeated calls"
+
+
+def _make_ordering_test_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(":memory:")
+    conn.executescript("""
+        CREATE TABLE types (id INTEGER PRIMARY KEY, curie TEXT);
+        CREATE TABLE identifiers (id INTEGER PRIMARY KEY, curie TEXT, label TEXT);
+        CREATE TABLE descriptions (id INTEGER PRIMARY KEY, desc TEXT);
+        CREATE TABLE cliques (
+            id INTEGER PRIMARY KEY,
+            primary_identifier_id INTEGER,
+            type_id INTEGER,
+            ic REAL,
+            preferred_name TEXT
+        );
+        CREATE TABLE identifiers_cliques (identifier_id INTEGER, clique_id INTEGER);
+        CREATE TABLE identifiers_descriptions (identifier_id INTEGER, description_id INTEGER);
+
+        INSERT INTO types VALUES (1, 'biolink:SmallMolecule');
+        INSERT INTO identifiers VALUES (1, 'CHEBI:1', 'Compound A'), (2, 'CHEBI:2', 'Compound B'), (3, 'CHEBI:3', 'Compound C'), (4, 'MESH:D014867', 'Water');
+        INSERT INTO descriptions VALUES (1, 'Desc A'), (2, 'Desc B'), (3, 'Desc C');
+        INSERT INTO cliques VALUES (3, 3, 1, 0.1, 'Compound C'), (1, 1, 1, 0.9, 'Compound A'), (2, 2, 1, 0.5, 'Compound B');
+        INSERT INTO identifiers_cliques VALUES (4, 3), (4, 1), (4, 2);
+        INSERT INTO identifiers_descriptions VALUES (1, 1), (2, 2), (3, 3);
+    """)
+    return conn
+
+
+def test_map_any_curie_to_cliques_ordering():
+    conn = _make_ordering_test_db()
+    results = map_any_curie_to_cliques(conn, "MESH:D014867")
+    assert isinstance(results, tuple)
+    assert len(results) == 3
+    identifiers = [r['id']['identifier'] for r in results]
+    assert identifiers == sorted(identifiers), (
+        f"Results should be sorted by identifier, got: {identifiers}"
+    )
+    results_again = map_any_curie_to_cliques(conn, "MESH:D014867")
+    assert results == results_again, "Results should be identical across repeated calls"
