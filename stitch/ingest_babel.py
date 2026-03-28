@@ -80,7 +80,7 @@ import sqlite3
 import sys
 import tempfile
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import IO, Any, Iterable, Optional, cast, overload
 from urllib.parse import urljoin
 
@@ -510,8 +510,10 @@ def _get_taxa_pkids_fill_in_if_necessary(cursor: sqlite3.Cursor,
                 raise ValueError(f"taxon missing from database: {taxon_curie}")
     return taxa_to_pkids
 
-def _get_biolink_type_pkids_from_curies(cursor: sqlite3.Cursor, curies: tuple[str]) \
+def _get_biolink_type_pkids_from_curies(cursor: sqlite3.Cursor, curies: Sequence[str]) \
         -> dict[str, int]:
+    if not curies:
+        return {}
     placeholders = ', '.join('?' for _ in curies)
     return dict((cursor.execute("SELECT curie, id FROM types "
                                 "WHERE curie IN "
