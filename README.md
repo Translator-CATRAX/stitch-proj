@@ -580,6 +580,16 @@ ln -s /mnt/localssd/stitch-proj /home/ubuntu/stitch-proj
 ```
 (but that symbolic link will persist even when you stop and then start the instance).
 
+After the above steps are done, as user `ubuntu`, 
+run these steps (which are from the setup instructions 
+at the top of this page):
+```
+cd ~
+git clone https://github.com/Translator-CATRAX/stitch-proj.git
+cd stitch-proj
+./run-setup-venv.sh
+```
+
 # Subdirectories in `stitch-proj`:
 - `stitch`: python modules for `stitch-proj`, that are meant to be imported and used
 - `tests`: pytest unit test modules
