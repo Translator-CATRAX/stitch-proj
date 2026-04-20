@@ -347,9 +347,7 @@ def _create_empty_database(database_file_name: str,
         ('conflation_clusters', SQL_CREATE_TABLE_CONFLATION_CLUSTERS),
         ('conflation_members', SQL_CREATE_TABLE_CONFLATION_MEMBERS))
     # The `ic` is the "information content" assigned by UberGraph. It is a real
-    # number between 0 and 100; 100 means that the concept is as specific as it
-    # can possibly be, in the relevant ontology (so I suppose it is a leaf node
-    # with no subclasses). The lower the `ic` score, the more "general" the concept.
+    # number between 0 and 100; 100 means that the concept is maximally specific.
     for table_name, statement in table_creation_statements:
         cur.execute(statement)
         _log_print(f"creating table: \"{table_name}\"")
