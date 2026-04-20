@@ -19,6 +19,7 @@ requires-python = ">=3.12"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["stitch*"]
+exclude = ["venv*", ".venv*", "build*", "dist*", "*.egg-info*"]
 
 [project.scripts]
 ingest-babel = "stitch.ingest_babel:_main"
