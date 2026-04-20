@@ -5,6 +5,8 @@ import sqlite3
 import pytest
 from stitch.local_babel import (
     connect_to_db_read_only,
+    get_all_names_for_curie,
+    get_categories_for_curie,
     get_n_random_curies,
     get_taxon_for_gene_or_protein,
     map_any_curie_to_cliques,
@@ -14,8 +16,6 @@ from stitch.local_babel import (
     map_curies_to_preferred_curies,
     map_pref_curie_to_synonyms,
     map_preferred_curie_to_cliques,
-    get_all_names_for_curie,
-    get_categories_for_curie,
 )
 
 
