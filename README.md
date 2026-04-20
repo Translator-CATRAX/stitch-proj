@@ -363,6 +363,9 @@ directory is. You will need this in order for the unit test module
 `tests/test_ingest_babel.py` to run successfully.
 
 # How to run the `stitch-proj` Babel sqlite ingest in AWS
+First, you need to edit `run-ingest-aws.sh` to update the value for the `BABEL_BASE_URL` 
+shell variable to point to the URL for the document root directory on the Babel file
+download webserver, for the most recent distribution of Babel. Then, follow these steps:
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
 - `cd stitch-proj`
 - `screen` (to enter a screen session)
