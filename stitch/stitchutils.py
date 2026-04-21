@@ -52,6 +52,7 @@ way.
 """
 import argparse
 import itertools
+import json
 import os
 import tempfile
 import time
@@ -61,8 +62,9 @@ from typing import Any, Iterable, Iterator, TypeVar, Union, cast
 
 import bmt
 import numpy as np
+import pandas as pd
 import requests
-from htmllistparse.htmllistparse import FileEntry, fetch_listing
+from htmllistparse.htmllistparse import FileEntry
 
 CONFLATION_TYPE_NAMES_IDS = \
     {'DrugChemical': 1,
@@ -334,3 +336,33 @@ def _cur_datetime_local_no_ms() -> datetime:  # does not return microseconds
 def cur_datetime_local_str() -> str:
     return _cur_datetime_local_no_ms().isoformat()
 
+
+def read_compendia_chunks(url: str,
+                          lines_per_chunk: int) -> Iterable[pd.DataFrame]:
+    """
+    Stream a remote JSON-lines file and yield pandas DataFrames containing
+    up to `lines_per_chunk` records each.
+
+    This avoids loading the full remote file into memory.
+    """
+    if lines_per_chunk <= 0:
+        raise ValueError("lines_per_chunk must be > 0")
+
+    with requests.get(url, stream=True) as response:
+        response.raise_for_status()
+
+        chunk_records: list[dict] = []
+
+        # decode_unicode=True makes iter_lines() yield str instead of bytes
+        for line in response.iter_lines(decode_unicode=True):
+            if not line:  # skip empty lines
+                continue
+
+            chunk_records.append(json.loads(line))
+
+            if len(chunk_records) >= lines_per_chunk:
+                yield pd.DataFrame.from_records(chunk_records)
+                chunk_records.clear()
+
+        if chunk_records:
+            yield pd.DataFrame.from_records(chunk_records)

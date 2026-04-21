@@ -621,10 +621,10 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                   for description_str in clique_identifier_info.get('d', [])))
     return process_compendia_chunk
 
-def _read_compendia_chunks(url: str,
-                           lines_per_chunk: int) -> Iterable[pd.DataFrame]:
-    return pd.read_json(url, lines=True,
-                        chunksize=lines_per_chunk)
+# def _read_compendia_chunks(url: str,
+#                            lines_per_chunk: int) -> Iterable[pd.DataFrame]:
+#     return pd.read_json(url, lines=True,
+#                         chunksize=lines_per_chunk)
 
 def _read_conflation_chunks(url: str,
                             lines_per_chunk: int) -> Iterable[list[str]]:
@@ -927,7 +927,7 @@ def _main_args(babel_compendia_url: str,
             _do_index_analyze(conn, log_work, False)
         do_ingest_compendia_url = \
             _make_url_ingester(conn, lines_per_chunk,
-                               _read_compendia_chunks, log_work)
+                               su.read_compendia_chunks, log_work)
         do_ingest_conflation_url = \
             _make_url_ingester(conn, lines_per_chunk,
                                _read_conflation_chunks, log_work)
