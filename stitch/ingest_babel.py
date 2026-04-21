@@ -73,7 +73,6 @@ import argparse
 import ast
 import functools
 import json
-import logging
 import math
 import os
 import sqlite3
@@ -86,7 +85,6 @@ from urllib.parse import urljoin
 
 import numpy
 import pandas as pd
-import ray
 from htmllistparse.htmllistparse import FileEntry, fetch_listing
 
 from stitch import stitchutils as su
@@ -621,14 +619,14 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                   for description_str in clique_identifier_info.get('d', [])))
     return process_compendia_chunk
 
-# def _read_compendia_chunks(url: str,
-#                            lines_per_chunk: int) -> Iterable[pd.DataFrame]:
-#     return pd.read_json(url, lines=True,
-#                         chunksize=lines_per_chunk)
+def _read_compendia_chunks(url: str,
+                           lines_per_chunk: int) -> Iterable[pd.DataFrame]:
+    return su.read_json_lines_from_url(url,
+                                       lines_per_chunk=lines_per_chunk)
 
 def _read_conflation_chunks(url: str,
                             lines_per_chunk: int) -> Iterable[list[str]]:
-    return su.get_line_chunks_from_url(url, lines_per_chunk)
+    return su.read_line_chunks_from_url(url, lines_per_chunk)
 
 def _do_log_work(start_times: tuple[float, float],
                  progress_info: tuple[int, int],
@@ -823,10 +821,6 @@ def _do_final_cleanup(conn: sqlite3.Connection,
         _log_print(f"Finished database ingest. "
                    f"Total elapsed time: {elapsed_time_str} (HHH:MM::SS)")
 
-def _initialize_ray():  # initialize Ray after any changes to tmp dir location
-    logging.getLogger("ray").setLevel(logging.ERROR)
-    ray.init(logging_level=logging.ERROR)
-
 def _customize_temp_dir(temp_dir: str,
                         no_exec: bool,
                         quiet: bool):
@@ -906,7 +900,6 @@ def _main_args(babel_compendia_url: str,
         _customize_temp_dir(temp_dir, no_exec, quiet)
     if test_type is not None and test_type == 1 and test_compendia_file is None:
         raise ValueError("for test type 1, you must specify --test_compendia_file")
-    _initialize_ray()
     print_ddl_file_obj = sys.stderr if print_ddl else None
     compendia_sorted_files, compendia_map_names = \
         _get_compendia_files(babel_compendia_url)
@@ -927,7 +920,7 @@ def _main_args(babel_compendia_url: str,
             _do_index_analyze(conn, log_work, False)
         do_ingest_compendia_url = \
             _make_url_ingester(conn, lines_per_chunk,
-                               su.read_compendia_chunks, log_work)
+                               _read_compendia_chunks, log_work)
         do_ingest_conflation_url = \
             _make_url_ingester(conn, lines_per_chunk,
                                _read_conflation_chunks, log_work)

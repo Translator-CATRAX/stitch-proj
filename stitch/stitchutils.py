@@ -25,8 +25,8 @@ This module provides:
 
 - **URL and file I/O**
   - `url_to_local_path`: Convert `file://` URLs to local filesystem paths.
-  - `get_lines_from_url`: Yield text lines from a local file or remote URL.
-  - `get_line_chunks_from_url`: Convenience wrapper to return line chunks
+  - `read_lines_from_url`: Yield text lines from a local file or remote URL.
+  - `read_line_chunks_from_url`: Convenience wrapper to return line chunks
     directly from a URL.
 
 Constants
@@ -236,7 +236,7 @@ def url_to_local_path(url: str) -> str:
         return urllib.parse.unquote(path)
     raise ValueError(f"Not a file:// URL: {url}")
 
-def get_lines_from_url(url_or_path: str) -> Iterator[str]:
+def read_lines_from_url(url_or_path: str) -> Iterator[str]:
     """
     Stream text lines from a `file://` URL or HTTP(S) URL.
 
@@ -284,11 +284,11 @@ def get_lines_from_url(url_or_path: str) -> Iterator[str]:
                 for line in f:
                     yield line.rstrip('\n')
 
-def get_line_chunks_from_url(url: str, chunk_size: int) -> Iterable[list[str]]:
+def read_line_chunks_from_url(url: str, chunk_size: int) -> Iterable[list[str]]:
     """
     Read lines from a URL and yield them in fixed-size chunks.
 
-    This is a convenience wrapper over `get_lines_from_url` + `chunked`.
+    This is a convenience wrapper over `read_lines_from_url` + `chunked`.
 
     Parameters
     ----------
@@ -303,7 +303,7 @@ def get_line_chunks_from_url(url: str, chunk_size: int) -> Iterable[list[str]]:
         An iterable over lists of lines, where each list contains up to
         `chunk_size` lines (the last chunk may be smaller).
     """
-    lines = get_lines_from_url(url)
+    lines = read_lines_from_url(url)
     return chunked(lines, chunk_size)
 
 def log_start_of_file(start: float, filetype: str, filename: str, filesize: int):
@@ -336,14 +336,14 @@ def _cur_datetime_local_no_ms() -> datetime:  # does not return microseconds
 def cur_datetime_local_str() -> str:
     return _cur_datetime_local_no_ms().isoformat()
 
-
-def read_compendia_chunks(url: str,
-                          lines_per_chunk: int) -> Iterable[pd.DataFrame]:
+def read_json_lines_from_url(url: str,
+                             lines_per_chunk: int) -> Iterable[pd.DataFrame]:
     """
     Stream a remote JSON-lines file and yield pandas DataFrames containing
     up to `lines_per_chunk` records each.
 
-    This avoids loading the full remote file into memory.
+    This implementation avoids loading the full remote file into memory and
+    explicitly guards against truncated/incomplete final JSON lines.
     """
     if lines_per_chunk <= 0:
         raise ValueError("lines_per_chunk must be > 0")
@@ -352,17 +352,52 @@ def read_compendia_chunks(url: str,
         response.raise_for_status()
 
         chunk_records: list[dict] = []
+        buffer = b""
 
-        # decode_unicode=True makes iter_lines() yield str instead of bytes
-        for line in response.iter_lines(decode_unicode=True):
-            if not line:  # skip empty lines
+        for data in response.iter_content(chunk_size=1024 * 1024):
+            if not data:
                 continue
 
-            chunk_records.append(json.loads(line))
+            buffer += data
 
-            if len(chunk_records) >= lines_per_chunk:
-                yield pd.DataFrame.from_records(chunk_records)
-                chunk_records.clear()
+            while True:
+                newline_pos = buffer.find(b"\n")
+                if newline_pos == -1:
+                    break
+
+                line = buffer[:newline_pos]
+                buffer = buffer[newline_pos + 1:]
+
+                line = line.strip()
+                if not line:
+                    continue
+
+                try:
+                    chunk_records.append(json.loads(line))
+                except json.JSONDecodeError as exc:
+                    preview = line[:200].decode("utf-8", errors="replace")
+                    raise ValueError(
+                        f"Invalid JSON line while streaming {url}: {exc}; "
+                        f"line preview: {preview!r}"
+                    ) from exc
+
+                if len(chunk_records) >= lines_per_chunk:
+                    yield pd.DataFrame.from_records(chunk_records)
+                    chunk_records.clear()
+
+        # After the stream ends, anything left in buffer is the final line
+        # (if non-empty). It must be a complete JSON object, not a truncated one.
+        trailing = buffer.strip()
+        if trailing:
+            try:
+                chunk_records.append(json.loads(trailing))
+            except json.JSONDecodeError as exc:
+                preview = trailing[:200].decode("utf-8", errors="replace")
+                raise ValueError(
+                    "Truncated or invalid final JSON line while "
+                    f"streaming {url}: {exc}; "
+                    f"line preview: {preview!r}"
+                ) from exc
 
         if chunk_records:
             yield pd.DataFrame.from_records(chunk_records)
