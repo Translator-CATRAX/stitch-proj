@@ -488,7 +488,8 @@ def _get_pkids_from_curies_with_missing(cursor: sqlite3.Cursor,
 
 def _get_taxa_pkids_fill_in_if_necessary(cursor: sqlite3.Cursor,
                                          curies: set[str],
-                                         insrt_msng_taxa: bool) -> \
+                                         insrt_msng_taxa: bool,
+                                         taxon_row_map: Optional[dict[str, int]] = None) -> \
                                          dict[str, Optional[int]]:
     taxa_to_pkids = _get_pkids_from_curies_with_missing(cursor, curies)
     # Build a mapping from taxon CURIE to its id
@@ -503,7 +504,9 @@ def _get_taxa_pkids_fill_in_if_necessary(cursor: sqlite3.Cursor,
                                           'RETURNING id;',
                                           (taxon_curie,))
             else:
-                raise ValueError(f"taxon missing from database: {taxon_curie}")
+                row_ctx = f" (row_id={taxon_row_map[taxon_curie]})" \
+                    if taxon_row_map and taxon_curie in taxon_row_map else ""
+                raise ValueError(f"taxon missing from database{row_ctx}: {taxon_curie}")
     return taxa_to_pkids
 
 def _get_biolink_type_pkids_from_curies(cursor: sqlite3.Cursor, curies: Sequence[str]) \
@@ -578,9 +581,15 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
             dict(curies_df[['curie', 'pkid']].itertuples(index=False, name=None))
         taxa = set(_flatten_taxa(curies_df['taxa']))
         if taxa:
+            taxon_row_map: dict[str, int] = {}
+            for _, _, _, row_taxa, _, chunk_row in curies_df.itertuples(index=False, name=None):
+                if row_taxa:
+                    for taxon in cast(list[str], row_taxa):
+                        taxon_row_map.setdefault(taxon, chunk_row)
             taxa_to_pkids = \
                 _get_taxa_pkids_fill_in_if_necessary(cursor, taxa,
-                                                     insrt_msng_taxa)
+                                                     insrt_msng_taxa,
+                                                     taxon_row_map)
             cursor.executemany('INSERT INTO identifiers_taxa '
                                '(identifier_id, taxa_identifier_id) '
                                'VALUES (?, ?);',
