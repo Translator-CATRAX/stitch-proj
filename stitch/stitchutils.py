@@ -20,14 +20,21 @@ This module provides:
   - `format_time_seconds_to_str`: Convert a floating-point seconds value into
     `HHH:MM:SS` formatted string.
 
+- **Logging**
+  - `make_log_print_controller`: Build a timestamped, toggleable stderr
+    logger (returns an `(impl, set_enabled)` pair).
+
 - **Iterators and chunking**
   - `chunked`: Yield successive chunks of a specified size from an iterator.
 
 - **URL and file I/O**
   - `url_to_local_path`: Convert `file://` URLs to local filesystem paths.
-  - `read_lines_from_url`: Yield text lines from a local file or remote URL.
-  - `read_line_chunks_from_url`: Convenience wrapper to return line chunks
-    directly from a URL.
+  - `list_local_directory`: List the files in a `file://` directory URL as
+    `FileEntry` items.
+  - `list_dir`: Return a directory listing for either an HTTP(S) index URL
+    (via `htmllistparse.fetch_listing`) or a `file://` URL.
+  - `read_line_chunks_from_url`: Download (or open) a URL and yield its
+    lines in fixed-size chunks.
 
 Constants
 ---------
@@ -54,17 +61,21 @@ import argparse
 import itertools
 import json
 import os
+import sys
 import tempfile
 import time
 import urllib
 from datetime import datetime
-from typing import Any, Iterable, Iterator, TypeVar, Union, cast
+from pathlib import Path
+from typing import Any, Callable, Iterable, Iterator, TypeVar, Union, cast
 
 import bmt
 import numpy as np
 import pandas as pd
 import requests
-from htmllistparse.htmllistparse import FileEntry
+from htmllistparse.htmllistparse import FileEntry, fetch_listing
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 CONFLATION_TYPE_NAMES_IDS = \
     {'DrugChemical': 1,
@@ -201,6 +212,29 @@ def chunked(iterator: Iterator[str], size: int) -> Iterable[list[str]]:
             break
         yield chunk
 
+def _download_to_temp_file(url: str, temp_dir: Path) -> Path:
+    temp_dir.mkdir(parents=True, exist_ok=True)
+
+    # Named temp file so we can reopen it later
+    with tempfile.NamedTemporaryFile(
+        mode="wb",
+        delete=False,
+        dir=temp_dir,
+        prefix="jsonl_",
+        suffix=".tmp",
+    ) as tmp_file:
+
+        temp_path = Path(tmp_file.name)
+
+        with _make_session().get(url, stream=True, timeout=(30, 600)) as resp:
+            resp.raise_for_status()
+
+            for chunk in resp.iter_content(chunk_size=1024 * 1024):
+                if chunk:
+                    tmp_file.write(chunk)
+
+    return temp_path
+
 def url_to_local_path(url: str) -> str:
     """
     Convert a `file://` URL into a local filesystem path.
@@ -236,59 +270,63 @@ def url_to_local_path(url: str) -> str:
         return urllib.parse.unquote(path)
     raise ValueError(f"Not a file:// URL: {url}")
 
-def read_lines_from_url(url_or_path: str) -> Iterator[str]:
+def list_local_directory(file_url: str) -> list[FileEntry]:
     """
-    Stream text lines from a `file://` URL or HTTP(S) URL.
+    List the regular files in a directory referenced by a ``file://`` URL.
 
-    For `file://` URLs, this opens the referenced local file. For remote
-    URLs, the content is downloaded to a temporary file (to avoid
-    `ChunkedEncodingError`) and then read as UTF-8 text.
-
-    Each yielded line has its trailing newline removed.
+    Parallel to :func:`htmllistparse.fetch_listing` for the limited subset
+    of fields the rest of the package reads (``name``, ``size``; ``mtime``
+    is taken from ``stat()``).  Subdirectories and non-file entries are
+    skipped.
 
     Parameters
     ----------
-    url_or_path : str
-        A `file://` URL for local files, or an HTTP(S) URL compatible with
-        `requests.get`.
+    file_url : str
+        A URL beginning with ``file://`` pointing at a directory.
 
-    Yields
-    ------
-    str
-        Lines of text with no trailing `\\n`.
+    Returns
+    -------
+    list[FileEntry]
+        One :class:`htmllistparse.htmllistparse.FileEntry` per regular file
+        in the directory, sorted by path.
 
     Raises
     ------
-    requests.exceptions.RequestException
-        If the HTTP(S) request fails.
-    OSError
-        If the local file cannot be opened/read.
+    ValueError
+        If ``file_url`` is not a ``file://`` URL (propagated from
+        :func:`url_to_local_path`).
     """
-    if url_or_path.startswith("file://"):
-        path = url_to_local_path(url_or_path)
-        with open(path, 'r', encoding='utf-8') as f:
-            for line in f:
-                yield line.rstrip('\n')
-    else:
-        # Download to a temporary file first, to avoid a ChunkedEncodingError
-        with tempfile.NamedTemporaryFile(mode='wb+', delete=True) as tmp_file:
-            with requests.get(url_or_path, stream=True, timeout=(10, 300)) as response:
-                response.raise_for_status()
-                for chunk in response.iter_content(chunk_size=8192):
-                    tmp_file.write(chunk)
-            tmp_file.flush()
-            tmp_file.seek(0)
+    directory = Path(url_to_local_path(file_url))
+    entries: list[FileEntry] = []
+    for child in sorted(directory.iterdir()):
+        if not child.is_file():
+            continue
+        stat = child.stat()
+        entries.append(FileEntry(child.name, stat.st_mtime, stat.st_size, "file"))
+    return entries
 
-            # Now read from the temp file as text
-            with open(tmp_file.name, 'r', encoding='utf-8') as f:
-                for line in f:
-                    yield line.rstrip('\n')
+def list_dir(index_url: str) -> list[FileEntry]:
+    """
+    Return the directory listing for ``index_url``.
 
-def read_line_chunks_from_url(url: str, chunk_size: int) -> Iterable[list[str]]:
+    HTTP(S) URLs are scraped via :func:`htmllistparse.fetch_listing`;
+    ``file://`` URLs are read locally via :func:`list_local_directory`.
+    """
+    if index_url.startswith("file://"):
+        return list_local_directory(index_url)
+    _, listing = fetch_listing(index_url)
+    return listing
+
+def read_line_chunks_from_url(
+        url: str, chunk_size: int, temp_dir: Path
+) -> Iterator[list[str]]:
     """
     Read lines from a URL and yield them in fixed-size chunks.
 
-    This is a convenience wrapper over `read_lines_from_url` + `chunked`.
+    For `file://` URLs the referenced local file is read directly. For
+    HTTP(S) URLs the content is first downloaded to a temporary file in
+    `temp_dir`, and that file is deleted after iteration completes (or on
+    error). Yielded lines have their trailing newline stripped.
 
     Parameters
     ----------
@@ -296,15 +334,34 @@ def read_line_chunks_from_url(url: str, chunk_size: int) -> Iterable[list[str]]:
         A `file://` URL or HTTP(S) URL to read from.
     chunk_size : int
         The number of lines per chunk (must be >= 1).
+    temp_dir : Path
+        Directory in which to place the downloaded temp file (HTTP(S) only).
 
-    Returns
-    -------
-    Iterable[list[str]]
-        An iterable over lists of lines, where each list contains up to
-        `chunk_size` lines (the last chunk may be smaller).
+    Yields
+    ------
+    list[str]
+        Consecutive chunks of up to `chunk_size` lines (the last chunk may
+        be smaller).
     """
-    lines = read_lines_from_url(url)
-    return chunked(lines, chunk_size)
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be > 0")
+
+    if url.startswith("file://"):
+        path = Path(url_to_local_path(url))
+        with path.open("r", encoding="utf-8") as f:
+            yield from chunked((line.rstrip("\n") for line in f), chunk_size)
+        return
+
+    temp_path = _download_to_temp_file(url, temp_dir)
+    try:
+        with temp_path.open("r", encoding="utf-8") as f:
+            yield from chunked((line.rstrip("\n") for line in f), chunk_size)
+    finally:
+        try:
+            temp_path.unlink(missing_ok=True)
+        except Exception:
+            # Don't let cleanup errors mask real failures
+            pass
 
 def log_start_of_file(start: float, filetype: str, filename: str, filesize: int):
     elapsed = format_time_seconds_to_str(time.time() - start)
@@ -312,12 +369,6 @@ def log_start_of_file(start: float, filetype: str, filename: str, filesize: int)
             f"starting ingest of {filetype} "
             f"file: {filename}; "
             f"file size: {filesize} bytes")
-
-def create_file_map(file_name: str) -> dict[str, FileEntry]:
-    file_size = os.path.getsize(file_name)
-    file_modif = os.path.getmtime(file_name)
-    file_entry = FileEntry(file_name, file_modif, file_size, "file")
-    return {file_name: file_entry}
 
 def merge_ints_to_str(t: Iterable[int], delim: str) -> str:
     return delim.join(map(str, t))
@@ -336,38 +387,72 @@ def _cur_datetime_local_no_ms() -> datetime:  # does not return microseconds
 def cur_datetime_local_str() -> str:
     return _cur_datetime_local_no_ms().isoformat()
 
-def read_json_lines_from_url(url: str,
-                             lines_per_chunk: int) -> Iterable[pd.DataFrame]:
-    """
-    Stream a remote JSON-lines file and yield pandas DataFrames containing
-    up to `lines_per_chunk` records each.
+type LogPrintImpl = Callable[[str, str], None]
+type SetEnabled = Callable[[bool], None]
 
-    This implementation avoids loading the full remote file into memory and
-    explicitly guards against truncated/incomplete final JSON lines.
+def make_log_print_controller() -> tuple[LogPrintImpl, SetEnabled]:
+    """
+    Build a timestamped, toggleable stderr logger.
+
+    Returns a `(impl, set_enabled)` pair: `impl(message, end)` prints
+    `"{ISO-local-datetime}: {message}"` to stderr (flushed) iff logging is
+    currently enabled; `set_enabled(bool)` flips that flag. Logging starts
+    disabled.
+    """
+    state: dict[str, bool] = {"enabled": False}
+    def impl(message: str, end: str = "\n") -> None:
+        if state["enabled"]:
+            date_time_local = cur_datetime_local_str()
+            print(f"{date_time_local}: {message}",
+                  end=end, file=sys.stderr, flush=True)
+    def set_enabled(enabled: bool) -> None:
+        state["enabled"] = enabled
+    return impl, set_enabled
+
+def _make_session() -> requests.Session:
+    session = requests.Session()
+    retries = Retry(
+        total=5,
+        connect=5,
+        read=5,
+        backoff_factor=1.0,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET"],
+    )
+    adapter = HTTPAdapter(max_retries=retries)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
+def read_json_lines_from_url(
+    url: str,
+    lines_per_chunk: int,
+    temp_dir: Path
+) -> Iterable[pd.DataFrame]:
+    """
+    Yield a JSON-lines file in pandas DataFrame chunks.
+
+    For `file://` URLs the referenced local file is read directly. For
+    HTTP(S) URLs the content is first downloaded to a temporary file in
+    `temp_dir`, and that file is deleted after iteration completes (or
+    on error).
     """
     if lines_per_chunk <= 0:
         raise ValueError("lines_per_chunk must be > 0")
 
-    with requests.get(url, stream=True) as response:
-        response.raise_for_status()
+    if url.startswith("file://"):
+        path_to_read = Path(url_to_local_path(url))
+        cleanup_path: Path | None = None
+    else:
+        path_to_read = _download_to_temp_file(url, temp_dir)
+        cleanup_path = path_to_read
 
+    try:
         chunk_records: list[dict] = []
-        buffer = b""
 
-        for data in response.iter_content(chunk_size=1024 * 1024):
-            if not data:
-                continue
-
-            buffer += data
-
-            while True:
-                newline_pos = buffer.find(b"\n")
-                if newline_pos == -1:
-                    break
-
-                line = buffer[:newline_pos]
-                buffer = buffer[newline_pos + 1:]
-
+        with path_to_read.open("r", encoding="utf-8") as f:
+            for line_num, line in enumerate(f, start=1):
                 line = line.strip()
                 if not line:
                     continue
@@ -375,9 +460,9 @@ def read_json_lines_from_url(url: str,
                 try:
                     chunk_records.append(json.loads(line))
                 except json.JSONDecodeError as exc:
-                    preview = line[:200].decode("utf-8", errors="replace")
+                    preview = line[:200]
                     raise ValueError(
-                        f"Invalid JSON line while streaming {url}: {exc}; "
+                        f"Invalid JSON on line {line_num} in {url}: {exc}; "
                         f"line preview: {preview!r}"
                     ) from exc
 
@@ -385,19 +470,14 @@ def read_json_lines_from_url(url: str,
                     yield pd.DataFrame.from_records(chunk_records)
                     chunk_records.clear()
 
-        # After the stream ends, anything left in buffer is the final line
-        # (if non-empty). It must be a complete JSON object, not a truncated one.
-        trailing = buffer.strip()
-        if trailing:
-            try:
-                chunk_records.append(json.loads(trailing))
-            except json.JSONDecodeError as exc:
-                preview = trailing[:200].decode("utf-8", errors="replace")
-                raise ValueError(
-                    "Truncated or invalid final JSON line while "
-                    f"streaming {url}: {exc}; "
-                    f"line preview: {preview!r}"
-                ) from exc
-
         if chunk_records:
             yield pd.DataFrame.from_records(chunk_records)
+
+    finally:
+        # Only the downloaded temp file is ours to delete; file:// inputs stay.
+        if cleanup_path is not None:
+            try:
+                cleanup_path.unlink(missing_ok=True)
+            except Exception:
+                # Don’t let cleanup errors mask real failures
+                pass
