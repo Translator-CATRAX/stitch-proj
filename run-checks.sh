@@ -1,5 +1,5 @@
 #!/usr/bin/env bash -x
-set -o nounset -o pipefail -o errexit
+set -euo pipefail
 
 run_mypy_cmd="venv/bin/mypy --ignore-missing-imports"
 run_ruff_cmd="venv/bin/ruff check"

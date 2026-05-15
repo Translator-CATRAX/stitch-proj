@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -o nounset -o pipefail -o errexit
+set -euo pipefail
 
 STITCH_DIR=/home/ubuntu/stitch-proj
 STITCH_TMP_DIR=${STITCH_DIR}/tmp
