@@ -560,7 +560,10 @@ venv/bin/python3 stitch/row_counts.py babel.sqlite
 ```
 
 # Special instructions for running `ingest_babel.py` in an `i4i.2xlarge` instance
-Then, every time you start the instance:
+[The instructions below are have been coded up in the experimental script
+`tools/setup-i4i-instance.sh`.]
+
+Every time you start the instance, you should run:
 ```
 sudo mkdir -p /mnt/localssd
 sudo lsblk
@@ -574,7 +577,7 @@ sudo mount /dev/nvme1n1 /mnt/localssd
 sudo chown ubuntu:ubuntu /mnt/localssd
 mkdir -p /mnt/localssd/stitch-proj
 ```
-And if it is the first time you are setting up the instance, you should do this step:
+And if it is the _first time_ you are setting up the instance, you should do this step:
 ```
 ln -s /mnt/localssd/stitch-proj /home/ubuntu/stitch-proj
 ```
