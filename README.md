@@ -367,6 +367,7 @@ First, you need to edit `run-ingest-aws.sh` to update the value for the `BABEL_B
 shell variable to point to the URL for the document root directory on the Babel file
 download webserver, for the most recent distribution of Babel. Then, follow these steps:
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
+- `curl -fsSL https://raw.githubusercontent.com/Translator-CATRAX/stitch-proj/refs/heads/main/tools/setup-i4i-instance.sh | bash`
 - `cd stitch-proj`
 - `screen` (to enter a screen session)
 - `./instance-memory-tracker.sh`
