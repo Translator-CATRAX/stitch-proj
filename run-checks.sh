@@ -7,6 +7,7 @@ run_vulture_cmd="venv/bin/vulture `find stitch tests -name \*.py ! -name '.#*.py
 run_pylint_cmd="venv/bin/pylint"
 files_to_check=(stitch/local_babel.py
                 stitch/ingest_babel.py
+                stitch/babel_schema.py
                 stitch/row_counts.py
                 conftest.py
                 tests/test_local_babel.py

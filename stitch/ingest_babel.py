@@ -89,7 +89,12 @@ import numpy
 import pandas as pd
 from htmllistparse.htmllistparse import FileEntry
 
+from stitch import babel_schema as bs
 from stitch import stitchutils as su
+from stitch.babel_schema import (
+    ALLOWED_CONFLATION_TYPES,
+    SQL__CREATE_INDEX_WORK_PLAN,
+)
 
 ChunkType = pd.DataFrame | list[str]
 
@@ -229,102 +234,8 @@ def _set_auto_vacuum(conn: sqlite3.Connection,
     _log_print(f"setting auto_vacuum to {switch_str}")
     conn.execute(f"PRAGMA auto_vacuum={switch_str};")
 
-SQL_CREATE_TABLE_TYPES = \
-    '''
-        CREATE TABLE types (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        curie TEXT NOT NULL UNIQUE);
-    '''
-
-SQL_CREATE_TABLE_IDENTIFIERS = \
-    '''
-        CREATE TABLE identifiers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        curie TEXT NOT NULL UNIQUE,
-        label TEXT);
-    '''
-
-SQL_CREATE_TABLE_CLIQUES = \
-    '''
-        CREATE TABLE cliques (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        primary_identifier_id INTEGER NOT NULL,
-        ic REAL,
-        type_id INTEGER NOT NULL,
-        preferred_name TEXT NOT NULL,
-        FOREIGN KEY(primary_identifier_id) REFERENCES identifiers(id),
-        FOREIGN KEY(type_id) REFERENCES types(id),
-        UNIQUE(primary_identifier_id, type_id));
-    '''
-
-SQL_CREATE_TABLE_DESCRIPTIONS = \
-    '''
-        CREATE TABLE descriptions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        desc TEXT NOT NULL);
-    '''
-
-SQL_CREATE_TABLE_IDENTIF_DESCRIP = \
-    '''
-        CREATE TABLE identifiers_descriptions (
-        description_id INTEGER NOT NULL,
-        identifier_id INTEGER NOT NULL,
-        FOREIGN KEY(description_id) REFERENCES descriptions(id),
-        FOREIGN KEY(identifier_id) REFERENCES identifiers(id));
-    '''
-
-SQL_CREATE_TABLE_IDENTIFIERS_CLIQUES = \
-    '''
-        CREATE TABLE identifiers_cliques (
-        identifier_id INTEGER NOT NULL,
-        clique_id INTEGER NOT NULL,
-        FOREIGN KEY(identifier_id) REFERENCES identifiers(id),
-        FOREIGN KEY(clique_id) REFERENCES cliques(id));
-    '''
-
-SQL_CREATE_TABLE_IDENTIFIERS_TAXA = \
-    '''
-        CREATE TABLE identifiers_taxa (
-        identifier_id INTEGER NOT NULL,
-        taxa_identifier_id INTEGER NOT NULL,
-        FOREIGN KEY(identifier_id) REFERENCES identifiers(id),
-        FOREIGN KEY(taxa_identifier_id) REFERENCES identifiers(id));
-    '''
-
 COMPENDIA_FILE_SUFFIX = '.txt'
 CONFLATION_FILE_SUFFIX = '.txt'
-ALLOWED_CONFLATION_TYPES = set(su.CONFLATION_TYPE_NAMES_IDS.values())
-
-SQL_CREATE_TABLE_CONFLATION_CLUSTERS = \
-    f'''
-        CREATE TABLE conflation_clusters (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type INTEGER NOT NULL CHECK (type in
-        ({su.merge_ints_to_str(ALLOWED_CONFLATION_TYPES, ', ')})));
-    '''
-
-SQL_CREATE_TABLE_CONFLATION_MEMBERS = \
-    '''
-        CREATE TABLE conflation_members (
-        cluster_id INTEGER NOT NULL,
-        identifier_id INTEGER NOT NULL,
-        is_canonical INTEGER NOT NULL CHECK (is_canonical in (0, 1)),
-        FOREIGN KEY(cluster_id) REFERENCES conflation_clusters(id),
-        FOREIGN KEY(identifier_id) REFERENCES identifiers(id),
-        UNIQUE(cluster_id, identifier_id))
-    '''
-
-SQL__CREATE_INDEX_WORK_PLAN = \
-    (('cliques',                  'type_id'),
-     ('cliques',                  'primary_identifier_id'),
-     ('identifiers_descriptions', 'description_id'),
-     ('identifiers_descriptions', 'identifier_id'),
-     ('identifiers_cliques',      'identifier_id'),
-     ('identifiers_cliques',      'clique_id'),
-     ('identifiers_taxa',         'identifier_id'),
-     ('identifiers_taxa',         'taxa_identifier_id'),
-     ('conflation_members',       'identifier_id'),
-     ('conflation_clusters',      'type'))
 
 def _create_empty_database(database_file_name: str,
                            print_ddl_file_obj: IO[str] | None = None) -> \
@@ -335,15 +246,15 @@ def _create_empty_database(database_file_name: str,
     _set_auto_vacuum(conn, auto_vacuum_on=False)
     cur = conn.cursor()
     table_creation_statements = (
-        ('types', SQL_CREATE_TABLE_TYPES),
-        ('identifiers', SQL_CREATE_TABLE_IDENTIFIERS),
-        ('cliques', SQL_CREATE_TABLE_CLIQUES),
-        ('descriptions', SQL_CREATE_TABLE_DESCRIPTIONS),
-        ('identifiers_descriptions', SQL_CREATE_TABLE_IDENTIF_DESCRIP),
-        ('identifiers_cliques', SQL_CREATE_TABLE_IDENTIFIERS_CLIQUES),
-        ('identifiers_taxa', SQL_CREATE_TABLE_IDENTIFIERS_TAXA),
-        ('conflation_clusters', SQL_CREATE_TABLE_CONFLATION_CLUSTERS),
-        ('conflation_members', SQL_CREATE_TABLE_CONFLATION_MEMBERS))
+        ('types', bs.SQL_CREATE_TABLE_TYPES),
+        ('identifiers', bs.SQL_CREATE_TABLE_IDENTIFIERS),
+        ('cliques', bs.SQL_CREATE_TABLE_CLIQUES),
+        ('descriptions', bs.SQL_CREATE_TABLE_DESCRIPTIONS),
+        ('identifiers_descriptions', bs.SQL_CREATE_TABLE_IDENTIF_DESCRIP),
+        ('identifiers_cliques', bs.SQL_CREATE_TABLE_IDENTIFIERS_CLIQUES),
+        ('identifiers_taxa', bs.SQL_CREATE_TABLE_IDENTIFIERS_TAXA),
+        ('conflation_clusters', bs.SQL_CREATE_TABLE_CONFLATION_CLUSTERS),
+        ('conflation_members', bs.SQL_CREATE_TABLE_CONFLATION_MEMBERS))
     # The `ic` is the "information content" assigned by UberGraph. It is a real
     # number between 0 and 100; 100 means that the concept is maximally specific.
     for table_name, statement in table_creation_statements:
@@ -481,11 +392,12 @@ def _get_pkids_from_curies_with_missing(cursor: sqlite3.Cursor,
     curies_to_pkids.update(_curies_to_pkids(cursor, curies))
     return curies_to_pkids
 
-def _get_taxa_pkids_fill_in_if_necessary(cursor: sqlite3.Cursor,
-                                         curies: set[str],
-                                         insrt_msng_taxa: bool,
-                                         taxon_row_map: Optional[dict[str, int]] = None) -> \
-                                         dict[str, Optional[int]]:
+def _get_taxa_pkids_fill_in_if_necessary(
+        cursor: sqlite3.Cursor,
+        curies: set[str],
+        insrt_msng_taxa: bool,
+        taxon_row_map: Optional[dict[str, int]] = None) -> \
+        dict[str, Optional[int]]:
     taxa_to_pkids = _get_pkids_from_curies_with_missing(cursor, curies)
     # Build a mapping from taxon CURIE to its id
     for taxon_curie, taxon_id in taxa_to_pkids.items():
@@ -577,7 +489,8 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
         taxa = set(_flatten_taxa(curies_df['taxa']))
         if taxa:
             taxon_row_map: dict[str, int] = {}
-            for _, _, _, row_taxa, _, chunk_row in curies_df.itertuples(index=False, name=None):
+            for _, _, _, row_taxa, _, chunk_row in curies_df.itertuples(
+                    index=False, name=None):
                 if row_taxa:
                     for taxon in cast(list[str], row_taxa):
                         taxon_row_map.setdefault(taxon, chunk_row)
