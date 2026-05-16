@@ -385,7 +385,8 @@ def _cur_datetime_local_no_ms() -> datetime:  # does not return microseconds
     return datetime.now().astimezone().replace(microsecond=0)
 
 def cur_datetime_local_str() -> str:
-    return _cur_datetime_local_no_ms().isoformat()
+    # space-separated date/time; render a zero UTC offset as ' UTC'
+    return _cur_datetime_local_no_ms().isoformat(sep=" ").replace("+00:00", " UTC")
 
 type LogPrintImpl = Callable[[str, str], None]
 type SetEnabled = Callable[[bool], None]
