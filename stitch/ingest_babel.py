@@ -912,7 +912,7 @@ def _main_args(babel_compendia_url: str,
             ingest_args_conflation.update({"glbl_chnk_cnt": glbl_chnk_cnt})
             glbl_chnk_cnt = ingest_urls(**ingest_args_conflation)
         else:
-            raise ValueError(f"invalid test_type: {test_type}")
+            raise ValueError(f"invalid test_type: {test_type}; must be one of 1, 2, 3, or None")
         _do_final_cleanup(conn, log_work, glbl_chnk_cnt, start_time_sec)
 
 def _main():
