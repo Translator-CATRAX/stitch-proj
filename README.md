@@ -495,15 +495,7 @@ which will run type checks (using `mypy`), lint checks (using `ruff`),
 dead code tests (using `vulture`), and unit tests (using `pytest`).
 Note that some of the unit tests require Internet connectivity; if
 you do not have a working Internet connection, and if you run the unit
-tests, you will see a runtime error like this:
-```
-E               urllib.error.URLError: <urlopen error [Errno 8] nodename nor servname provided, or not known>
-
-/opt/homebrew/Cellar/python@3.12/3.12.7_1/Frameworks/Python.framework/Versions/3.12/lib/python3.12/urllib/request.py:1347: URLError
-=========================================== short test summary info ============================================
-FAILED tests/test_stitchutils.py::test_get_biolink_categories - urllib.error.URLError: <urlopen error [Errno 8] nodename nor servname provided, or not known>
-========================================= 1 failed, 17 passed in 1.96s =========================================
-```
+tests, you will see a ` urllib.error.URLError` runtime error.
 
 # How to run just the unit test suite
 First, you need to make sure that underneath the top-level
