@@ -366,8 +366,9 @@ directory is. You will need this in order for the unit test module
 First, you need to edit `run-ingest-aws.sh` to update the value for the `BABEL_BASE_URL` 
 shell variable to point to the URL for the document root directory on the Babel file
 download webserver, for the most recent distribution of Babel. Then, follow these steps:
-- `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
-- `curl -fsSL https://raw.githubusercontent.com/Translator-CATRAX/stitch-proj/refs/heads/main/tools/setup-i4i-instance.sh | bash`
+- `ssh ubuntu@my-build-instance.rtx.ai` (if running in AWS); else just create a new `bash` session
+- [If you are running in an `i4i` AWS instance with a local SSD, run this command: 
+`curl -fsSL https://raw.githubusercontent.com/Translator-CATRAX/stitch-proj/refs/heads/main/tools/setup-i4i-instance.sh | bash`]
 - `cd stitch-proj`
 - `screen` (to enter a screen session)
 - `./instance-memory-tracker.sh`
@@ -552,10 +553,12 @@ cd stitch-proj
 venv/bin/python3 stitch/row_counts.py babel.sqlite
 ```
 
-# Special instructions for running `ingest_babel.py` in an `i4i.2xlarge` instance
+# Special instructions for running `ingest_babel.py` in an `i4i` instance with a local SSD
 [The instructions below are have been coded up in the experimental script
-`tools/setup-i4i-instance.sh`.] The `i4i.2xlarge` instance that we typically
-use for Babel ingests is `stitch2.rtx.ai`.
+`tools/setup-i4i-instance.sh`.] The `i4i` series EC2 instances have local SSD storage
+that is ephemeral, i.e., the SSD volume must be set up anew each time the instance
+is started up. The `i4i.2xlarge` instance that we typically use for Babel ingests is 
+`stitch2.rtx.ai`.
 
 Every time you start the instance, you should run:
 ```
