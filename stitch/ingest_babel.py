@@ -429,6 +429,7 @@ def _get_biolink_type_pkids_from_curies(cursor: sqlite3.Cursor, curies: Sequence
 def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                                     insrt_msng_taxa: bool = False,
                                     non_umls_compendia_file: bool = True) -> Callable:
+    # pylint: disable=too-many-locals
     def process_compendia_chunk(chunk: pd.DataFrame):
         cursor = conn.cursor()
         biolink_curie_to_pkid = \
