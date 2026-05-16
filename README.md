@@ -561,7 +561,8 @@ venv/bin/python3 stitch/row_counts.py babel.sqlite
 
 # Special instructions for running `ingest_babel.py` in an `i4i.2xlarge` instance
 [The instructions below are have been coded up in the experimental script
-`tools/setup-i4i-instance.sh`.]
+`tools/setup-i4i-instance.sh`.] The `i4i.2xlarge` instance that we typically
+use for Babel ingests is `stitch2.rtx.ai`.
 
 Every time you start the instance, you should run:
 ```
