@@ -501,6 +501,8 @@ cd stitch-proj
 source venv/bin/activate
 bash -x run-integration-tests.sh
 ```
+Note, running the integration tests takes a long time (an hour and 15 minutes
+at last check).
 
 # Analyzing the local Babel sqlite database
 If you are a developer looking to improve `local_babel.py`, 
