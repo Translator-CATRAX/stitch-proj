@@ -498,7 +498,7 @@ tests:
 ```
 cd stitch-proj
 source venv/bin/activate
-./run-integration-tests.sh
+bash -x run-integration-tests.sh
 ```
 
 # Analyzing the local Babel sqlite database
@@ -776,7 +776,7 @@ External contributions are welcome.
 - **Before submitting a PR**: run `./run-checks.sh` (which runs `mypy`,
   `ruff`, `vulture`, and `pytest`); see
   "[Running the type checks, lint checks, dead code checks, and unit tests](#running-the-type-checks-lint-checks-dead-code-checks-and-unit-tests)".
-  Larger changes should also pass `./run-integration-tests.sh`.
+  Larger changes should also pass `run-integration-tests.sh`.
   Note: the project does not currently have a continuous-integration
   (CI) pipeline set up, so these local checks are the only safeguard
   against breakage.
