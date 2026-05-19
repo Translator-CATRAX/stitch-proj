@@ -93,6 +93,7 @@ SQL_CREATE_TABLE_CONFLATION_MEMBERS = \
 SQL__CREATE_INDEX_WORK_PLAN = \
     (('cliques',                  'type_id'),
      ('cliques',                  'primary_identifier_id'),
+     ('descriptions',             'desc'),
      ('identifiers_descriptions', 'description_id'),
      ('identifiers_descriptions', 'identifier_id'),
      ('identifiers_cliques',      'identifier_id'),
