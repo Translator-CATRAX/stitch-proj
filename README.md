@@ -701,7 +701,7 @@ When releasing a new version:
 2. Remove old build artifacts using the project's clean script (see
    "[Cleaning build artifacts](#cleaning-build-artifacts)" below):
    ```bash
-   venv/bin/python tools/clean.py
+   ./tools/clean.sh
    ```
 3. Rebuild:
    ```bash
@@ -714,14 +714,14 @@ When releasing a new version:
 
 # Cleaning build artifacts
 
-The script [`tools/clean.py`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/tools/clean.py)
+The script [`tools/clean.sh`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/tools/clean.sh)
 removes the local working-directory output produced by `python -m build`
 and `pip install -e .` -- specifically the `build/`, `dist/`, and
-`*.egg-info/` directories at the project root. Run it from the project
-root with:
+`*.egg-info/` directories at the project root. Run it from anywhere
+in the repository (it `cd`s to the repo root itself):
 
 ```bash
-venv/bin/python tools/clean.py
+./tools/clean.sh
 ```
 
 You should run it:
