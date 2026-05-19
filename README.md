@@ -69,7 +69,13 @@ the Graviton3 processor. I've tested on the following MacOS system:
 
 ## Installation
 
-### Standard Usage
+Here are the instructions for installing the `stich-proj` software package from PyPI so you can
+import the `stitch.local_babel` module for querying an already-ingested Babel sqlite database.
+(For instructions on how to install stitch for actually _running_ a Babel sqlite ingest, 
+see the section "Setup of a python virtualenv for using the `stitch` software for an ingest")
+below.
+
+### Installation of the local_babel package from PyPI
 
 Install from PyPI:
 
@@ -83,33 +89,19 @@ Import in your project:
 import stitch_proj.local_babel as lb
 ```
 
-The following core dependencies are installed automatically:
+The `stitch-proj` package has the following runtime PyPI distribution package
+dependencies (see [`requirements.txt`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/requirements.txt)):
 
-- bmt >= 1.4.5  
-- requests >= 2.32.5  
-- pandas >= 2.2.3  
-- ray >= 2.43.0  
-- htmllistparse >= 0.6.1  
+- bmt == 1.4.5
+- htmllistparse == 0.6.1
+- pandas == 2.2.3
+- requests == 2.32.5
 
----
-
-### Development Installation
-
-For development work, install with:
-
-```bash
-pip install stitch-proj[dev]
-```
-
-This includes additional development tools:
-
-- pytest >= 8.3.5  
-- mypy >= 1.15.0  
-- ruff >= 0.11.12  
-- pylint >= 3.3.8  
-- vulture >= 2.14  
-- pandas-stubs  
-- types-requests  
+Note that `pyproject.toml` does not currently declare these in a
+`[project] dependencies` table, so `pip install stitch-proj` will _not_
+pull them in automatically; for now, install them explicitly with
+`pip install -r requirements.txt` (after cloning the repository) or
+`pip install bmt htmllistparse pandas requests`.
 
 # Packaging Process for `stitch-proj`
 
@@ -148,92 +140,31 @@ Key points:
 
 ## 2. pyproject.toml Configuration
 
-Packaging is defined entirely in `pyproject.toml` (PEP 517/518/621 compliant).
+Packaging is defined entirely in
+[`pyproject.toml`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/pyproject.toml)
+(PEP 517/518/621 compliant). See that file for the authoritative configuration;
+at a high level it covers:
 
-It specifies:
-
-- Build system (`setuptools`, `wheel`)
-- Project name
-- Version
-- Description
-- Authors
-- License
-- Python version requirement (>= 3.12)
-- Dependencies
-- Optional development dependencies
-- Package discovery via `src`
-
-Example critical sections:
-
-```toml
-[build-system]
-requires = ["setuptools>=61"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "stitch-proj"
-version = "0.1.0"
-authors = [
-  { name="First Last", email="example@example.com" },
-]
-
-maintainers = [
-  { name="First Last", email="example@example.com" },
-]
-
-description = "the description for the package. Should be just a few sentencees"
-readme = "README.md"
-requires-python = ">=3.12"
-license = { file = "LICENSE" }
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
-    "Development Status :: 3 - Alpha",
-]
-
-dependencies = [
- list general dependencies, everyone will need to run the app here
-]
-
-[project.optional-dependencies]
-dev = [
-list dependencies only devs will need to run the app here
-]
-
-[project.urls]
-Homepage = "github repository where the code for this package lives"
-Issues = "where issues should be documented"
-
-[project.scripts]
-ingest-babel = "stitch_proj.ingest_babel:_main"
-
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["stitch_proj*"]
-
-[tool.ruff]
-target-version = "py312"
-line-length = 88
-
-[tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP"]
-ignore = []
-
-[tool.pytest.ini_options]
-pythonpath = ["src"]
-testpaths = ["tests"]
-```
+- Build system (`setuptools`)
+- Project metadata (name, version, Python version requirement)
+- Package discovery
+- Console scripts (e.g., `ingest-babel`)
+- Tool configuration for `ruff` and `pytest`
 
 ---
 
 ## 3. Install Build Tools
 
-Before building:
-
+You should already have the PyPI packages `build` and `twine` in your virtualenv from
+having run `run-setup-venv.sh --dev`, and thus you just need to activate your virtualenv:
+```
+source venv/bin/activate
+```
+But if you need to manually install them for some reason, the command would be:
 ```bash
 python -m pip install --upgrade build twine
 ```
-
+The `build` and `twine` packages each perform a key function in the build process:
 - `build` generates distributions
 - `twine` uploads to PyPI
 
@@ -303,10 +234,13 @@ After upload:
 pip install stitch-proj
 ```
 
-Or for development:
+For development work, clone the repository and install the dev dependencies
+from `requirements-dev.txt`:
 
 ```bash
-pip install stitch-proj[dev]
+git clone https://github.com/Translator-CATRAX/stitch-proj.git
+cd stitch-proj
+./run-setup-venv.sh --dev
 ```
 
 ---
@@ -333,23 +267,36 @@ When releasing a new version:
 
 
 # Python distribution package requirements 
-All external PyPI distribution package requirements for the `stitch-proj` project are listed in the
-[`requirements.txt`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/requirements.txt) file.  
+External PyPI distribution package requirements for the `stitch-proj` project are split across two files:
+[`requirements.txt`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/requirements.txt)
+contains the runtime dependencies needed to _use_ the software (for either querying or
+ingesting Babel), and
+[`requirements-dev.txt`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/requirements-dev.txt)
+contains the additional packages needed only when _developing_ `stitch-proj` (e.g., for running
+`run-checks.sh`, or for building and uploading a release to PyPI).
 The `run-checks.sh` script (see section "Running
 the type checks, lint checks, ..." below) depends on the packages `pytest`,
-`ruff`, `vulture`, and `pylint`.  For a "querying" type user that is just using
+`ruff`, `vulture`, and `pylint`, all of which are listed in `requirements-dev.txt`.
+For a "querying" type user that is just using
 `local_babel.py`, only three PyPI distribution packages are needed, `requests`,
 `numpy`, and the Biolink Model Toolkit (`bmt`). Additionally, for an "ingester"
 type user who wants to run `ingest_babel.py` to build a local Babel sqlite
 database from scratch, the PyPI packages `pandas`, `ray`, and
 `htmllistparse` are needed. The `requirements.txt` file contains
-the full set of dependencies.
+the full set of runtime dependencies; developers should install both files
+(or use `run-setup-venv.sh --dev`).
 
-# Setup of a python virtualenv for using the `stitch` software
-You can just run
+# Setup of a python virtualenv for using or developing the `stitch` software
+If you just want to _use_ the stitch software to run a Babel ingest, you can run
 ```
 cd stitch-proj
 ./run-setup-venv.sh
+```
+But if you plan on developing, modifying, or testing the stitch software, you will 
+need to include the "development" PyPI distribution package dependencies:
+```
+cd stitch-proj
+./run-setup-venv.sh --dev
 ```
 Or if you are using AWS,
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
