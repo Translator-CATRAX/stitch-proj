@@ -199,7 +199,7 @@ def _create_index(
     index_name = extra_args.get('index_name', f'idx_{table}_{col}')
     index_type_blank_or_unique = extra_args.get('index_type_blank_or_unique', '')
     index_where_clause = extra_args.get('index_where_clause', '')
-    statement = (f'CREATE {index_type_blank_or_unique} INDEX '
+    statement = (f'CREATE {index_type_blank_or_unique} INDEX IF NOT EXISTS '
                  f'{index_name} '
                  f'ON {table} ({col}) {index_where_clause};')
     _log_print(f"creating {index_type_blank_or_unique} index {index_name} " \
@@ -610,14 +610,26 @@ def _make_url_ingester(conn: sqlite3.Connection,
     return ingest_from_url
 
 def _create_indices(conn: sqlite3.Connection,
+                    phase: int,
                     print_ddl_file_obj: IO[str] | None = None):
-    for table, col in SQL__CREATE_INDEX_WORK_PLAN:
-        _create_index(table, col, conn, print_ddl_file_obj)
-    _create_index('conflation_members', 'cluster_id', conn,
-                  print_ddl_file_obj=print_ddl_file_obj,
-                  index_name='one_canonical_per_cluster',
-                  index_type_blank_or_unique='UNIQUE',
-                  index_where_clause='WHERE is_canonical = 1')
+    """Create indexes from SQL__CREATE_INDEX_WORK_PLAN matching `phase`.
+
+    `phase=1` creates indexes that are useful during the bulk ingest
+    (called once just after CREATE TABLE). `phase=2` creates indexes
+    that are deferred until after the bulk inserts are done. The
+    special UNIQUE partial index on conflation_members is always
+    created in phase 1 (its uniqueness constraint must be in place
+    during the ingest).
+    """
+    for table, col, idx_phase in SQL__CREATE_INDEX_WORK_PLAN:
+        if idx_phase == phase:
+            _create_index(table, col, conn, print_ddl_file_obj)
+    if phase == 1:
+        _create_index('conflation_members', 'cluster_id', conn,
+                      print_ddl_file_obj=print_ddl_file_obj,
+                      index_name='one_canonical_per_cluster',
+                      index_type_blank_or_unique='UNIQUE',
+                      index_where_clause='WHERE is_canonical = 1')
 
 TEST_2_COMPENDIA = ('OrganismTaxon.txt', 'ComplexMolecularMixture.txt',
                     'Polypeptide.txt', 'PhenotypicFeature.txt')
@@ -834,7 +846,7 @@ def _main_args(babel_compendia_url: str,
         if not use_existing_db:
             functools.partial(_ingest_biolink_categories, conn, log_work)(
                 *su.get_biolink_categories())
-            _create_indices(conn, print_ddl_file_obj=print_ddl_file_obj)
+            _create_indices(conn, phase=1, print_ddl_file_obj=print_ddl_file_obj)
             _do_index_analyze(conn, log_work, False)
         do_ingest_compendia_url = \
             _make_url_ingester(conn, lines_per_chunk,
@@ -914,6 +926,7 @@ def _main_args(babel_compendia_url: str,
         else:
             raise ValueError(f"invalid test_type: {test_type}; "
                              "must be one of 1, 2, 3, or None")
+        _create_indices(conn, phase=2, print_ddl_file_obj=print_ddl_file_obj)
         _do_final_cleanup(conn, log_work, glbl_chnk_cnt, start_time_sec)
 
 def _main():

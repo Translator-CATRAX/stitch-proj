@@ -15,6 +15,7 @@ def test_create_empty_database():
 def test_create_indices():
     c = ingest_babel._create_empty_database("tests/test.sqlite",
                                             print_ddl_file_obj=None)
-    ingest_babel._create_indices(c, print_ddl_file_obj=None)
+    ingest_babel._create_indices(c, phase=1, print_ddl_file_obj=None)
+    ingest_babel._create_indices(c, phase=2, print_ddl_file_obj=None)
     c.close()
     os.unlink("tests/test.sqlite")

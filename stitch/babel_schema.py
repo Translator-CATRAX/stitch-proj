@@ -90,15 +90,35 @@ SQL_CREATE_TABLE_CONFLATION_MEMBERS = \
         UNIQUE(cluster_id, identifier_id))
     '''
 
+# Index creation work plan. Each entry is (table, column, phase):
+#   phase 1: create the index just after CREATE TABLE, before any bulk
+#            inserts. Use this for indexes that are needed during the
+#            ingest itself -- either to support a SELECT/JOIN lookup
+#            that runs during ingest, or to enforce a uniqueness
+#            constraint as INSERTs happen.
+#   phase 2: defer creation until after all bulk inserts are done.
+#            This avoids the per-row index-maintenance cost during
+#            ingest, at the cost of one bulk index build at the end.
+#            Use this whenever an index is not needed by any
+#            ingest-time query plan or constraint check, but is needed
+#            after the ingest (e.g., for `local_babel.py` queries).
+# As of this writing every entry below is phase 2, because no SELECT
+# in `ingest_babel.py` uses any of these indexes (those queries lookup
+# `identifiers.curie` and `types.curie`, both of which are covered by
+# the implicit UNIQUE indexes from CREATE TABLE). The special partial
+# UNIQUE index `one_canonical_per_cluster` on `conflation_members` is
+# created in phase 1 from within `_create_indices` in `ingest_babel.py`
+# because it enforces an INSERT-time constraint and must exist during
+# the conflation ingest.
 SQL__CREATE_INDEX_WORK_PLAN = \
-    (('cliques',                  'type_id'),
-     ('cliques',                  'primary_identifier_id'),
-     ('descriptions',             'desc'),
-     ('identifiers_descriptions', 'description_id'),
-     ('identifiers_descriptions', 'identifier_id'),
-     ('identifiers_cliques',      'identifier_id'),
-     ('identifiers_cliques',      'clique_id'),
-     ('identifiers_taxa',         'identifier_id'),
-     ('identifiers_taxa',         'taxa_identifier_id'),
-     ('conflation_members',       'identifier_id'),
-     ('conflation_clusters',      'type'))
+    (('cliques',                  'type_id',               2),
+     ('cliques',                  'primary_identifier_id', 2),
+     ('descriptions',             'desc',                  2),
+     ('identifiers_descriptions', 'description_id',        2),
+     ('identifiers_descriptions', 'identifier_id',         2),
+     ('identifiers_cliques',      'identifier_id',         2),
+     ('identifiers_cliques',      'clique_id',             2),
+     ('identifiers_taxa',         'identifier_id',         2),
+     ('identifiers_taxa',         'taxa_identifier_id',    2),
+     ('conflation_members',       'identifier_id',         2),
+     ('conflation_clusters',      'type',                  2))
