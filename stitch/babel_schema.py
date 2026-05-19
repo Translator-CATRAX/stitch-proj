@@ -68,7 +68,8 @@ SQL_CREATE_TABLE_IDENTIFIERS_TAXA = \
         identifier_id INTEGER NOT NULL,
         taxa_identifier_id INTEGER NOT NULL,
         FOREIGN KEY(identifier_id) REFERENCES identifiers(id),
-        FOREIGN KEY(taxa_identifier_id) REFERENCES identifiers(id));
+        FOREIGN KEY(taxa_identifier_id) REFERENCES identifiers(id),
+        UNIQUE(identifier_id, taxa_identifier_id));
     '''
 
 SQL_CREATE_TABLE_CONFLATION_CLUSTERS = \
@@ -118,7 +119,6 @@ SQL__CREATE_INDEX_WORK_PLAN = \
      ('identifiers_descriptions', 'identifier_id',         2),
      ('identifiers_cliques',      'identifier_id',         2),
      ('identifiers_cliques',      'clique_id',             2),
-     ('identifiers_taxa',         'identifier_id',         2),
      ('identifiers_taxa',         'taxa_identifier_id',    2),
      ('conflation_members',       'identifier_id',         2),
      ('conflation_clusters',      'type',                  2))
