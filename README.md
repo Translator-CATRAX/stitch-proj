@@ -8,10 +8,10 @@ The ingest tools automatically download Babel using "compendia" and "conflation"
 There are two types of intended users for the `stitch-proj` software: someone who is
 tasked with ingesting the
 [Babel concept identifier normalization database](https://github.com/TranslatorSRI/Babel)
-into a local sqlite databse (an "ingester") and someone developing a
+into a local sqlite database (an "ingester") and someone developing an
 application, such as a BigKG build system, that wants to programmatically query
 a local Babel sqlite database for node normalization, etc. ("querier"). The
-"ingester" type user will need to rea this entire README document, in order to
+"ingester" type user will need to read this entire README document, in order to
 be able to set up and run the `ingest_babel.py` program to carry out an ingest
 of Babel into a local sqlite database. The "querier" type user can skip over the
 sections of this document that discuss ingesting Babel, and focus on the
@@ -54,28 +54,24 @@ The `stitch-proj` project's module `ingest_babel.py` has been tested in three co
 - To enable local compilation of CPython, Numpy, and Pandas, the following packages were `apt` installed: `sqlite3`, `build-essential`, `gcc`, `g++`, `make`, `libffi-dev`, `libssl-dev`, `zlib1g-dev`, `libbz2-dev`, `libreadline-dev`, `libsqlite3-dev`, `libncursesw5-dev`, `tk-dev`, `libgdbm-dev`, `libnss3-dev`, `liblzma-dev`, `uuid-dev`, `python3-dev`, `gfortran`, `libopenblas-dev`, `liblapack-dev`, `libfreetype6-dev`, `libpng-dev`, `libjpeg-dev`, `libtiff-dev`, `libffi-dev`, `liblzma-dev`, `pkg-config`, `cmake`, `python3.12-venv`.
 
 ## MacOS/Apple Silicon
-- We have tested only _partial_ ingests of Babel on this system type. For reasons 
-I don't fully understand, `ingest_babel.py` runs quite fast on the M1 Max, compared to
-the Graviton3 processor. I've tested on the following MacOS system:
+- Only _partial_ ingests of Babel have been tested on this system type. For reasons
+that are not fully understood, `ingest_babel.py` runs quite fast on the M1 Max, compared to
+the Graviton3 processor. Testing has been done on the following MacOS system:
 - MacOS 14.6.1
 - Apple M1 Max processor, 64 GiB of memory
 - Apple SSD AP2048R Media SSD (2 TiB)
 - `python3.12` installed via Homebrew
 - `openblas` installed via Homebrew
 
-# stitch-proj
+# Installing stitch-proj from PyPI
 
 `stitch-proj` is available on PyPI and requires **Python 3.12 or newer**.
 
-## Installation
-
-Here are the instructions for installing the `stich-proj` software package from PyPI so you can
+These are the instructions for installing the `stitch-proj` software package from PyPI so you can
 import the `stitch.local_babel` module for querying an already-ingested Babel sqlite database.
-(For instructions on how to install stitch for actually _running_ a Babel sqlite ingest, 
-see the section "Setup of a python virtualenv for using the `stitch` software for an ingest")
+For instructions on how to install stitch for actually _running_ a Babel sqlite ingest,
+see the section "Setup of a python virtualenv for using or developing the `stitch` software"
 below.
-
-### Installation of the local_babel package from PyPI
 
 Install from PyPI:
 
@@ -86,7 +82,7 @@ pip install stitch-proj
 Import in your project:
 
 ```python
-import stitch_proj.local_babel as lb
+import stitch.local_babel as lb
 ```
 
 The `stitch-proj` package has the following runtime PyPI distribution package
@@ -104,8 +100,8 @@ pull them in automatically; for now, install them explicitly with
 `pip install bmt htmllistparse pandas requests`.
 
 
-# Setup of a python virtualenv for using the `stitch` software
-You can just run
+# Setup of a python virtualenv for using or developing the `stitch` software
+If you just want to _use_ the stitch software to run a Babel ingest, you can run
 ```
 cd stitch-proj
 ./run-setup-venv.sh
@@ -179,16 +175,17 @@ configuring `ingest_babel.py` to use that temp dir (and ensuring that the final
 output Babel sqlite file goes into the same filesystem).
 
 # Downloading a pre-built Babel sqlite database file
-[`babel-20250331-p1.sqlite`](https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250331-p1.sqlite)
-(181.6 GiB) is available for download from AWS S3.  For details and an MD5
-checksum hash, see the (Releases
-page)[https://github.com/Translator-CATRAX/stitch-proj/releases] for the stitch
+[`babel-20250901-p1.sqlite`](https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250901-p2.sqlite)
+(217 GiB) is available for download from AWS S3.  For details and an MD5
+checksum hash, see the [Releases page](https://github.com/Translator-CATRAX/stitch-proj/releases) for the stitch
 project. You will need to download (or, alternatively, build from scratch using
 `ingest_babel.py`) this file in order to be able to run the unit test 
-suite. The "-p1" on the downloadable sqlite database indicates that
-the database has been patched once, to add the `is_canonical` column
+suite. The "-p2" on the downloadable sqlite database indicates that
+the database has been patched twice, once to add the `is_canonical` column
 to the `conflation_members` table 
-(see [stitch-proj issue 80](https://github.com/Translator-CATRAX/stitch-proj/issues/80)).
+(see [stitch-proj issue 80](https://github.com/Translator-CATRAX/stitch-proj/issues/80)),
+and a second time in order to create an index on the column `desc` in the `descriptions` 
+table (see [stitch-proj issue 87](https://github.com/Translator-CATRAX/stitch-proj/issues/87)).
 
 # The local Babel sqlite database schema
 This schema diagram was generated using [DbVisualizer](https://www.dbvis.com) Free version 24.3.3.
@@ -204,9 +201,8 @@ sqlite> SELECT primary_identifier_id, type_id, COUNT(*) as count
 ```
 In contrast, the column `primary_identifier_id` on the `cliques` table by itself
 is not unique; there can be more than one clique with the same
-`primary_identifier_id` and different `type_id` values.  In theory, I should
-probably add a two-column uniqueness constraint to the `cliques` table, but I
-have not yet done so.  See issue 16:
+`primary_identifier_id` and different `type_id` values.  A two-column uniqueness
+constraint should probably be added to the `cliques` table; see issue 16:
 https://github.com/Translator-CATRAX/stitch-proj/issues/16
 
 # Analyzing the local Babel sqlite database
@@ -216,7 +212,7 @@ from the [sqlite software project area on GitHub](https://github.com/sqlite/sqli
 On Ubuntu, you can just perform the following steps to have
 `sqlite3_analyzer` available in `/usr/local/bin`:
 ```
-cd stitch-prod
+cd stitch-proj
 git clone https://github.com/sqlite/sqlite.git
 cd sqlite
 ./configure --prefix=/usr/local
@@ -240,16 +236,16 @@ The analysis should take less than an hour.
 For now, see the module `tests/test_local_babel.py` for examples.
 
 # Setting up local Babel sqlite database so you can run the unit tests:
-First, download `babel-20250331.sqlite` from S3 as described above, and ensure
+First, download the Babel sqlite file from S3 as described above, and ensure
 that in the top-level `stitch-proj` directory, there is a symbolic link `db` or
 a subdirectory `db` such that if the current working directory is the top-level
-`stitch-proj` directory, the relative path `db/babel-2025331.sqlite` can open
+`stitch-proj` directory, the relative path `db/babel-VERSION.sqlite` can open
 the database file.  Something like this should do it:
 ```
 cd stitch-proj
 mkdir -p db
-curl -s -L https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250331.sqlite > \
-    db/babel-20250331.sqlite
+curl -s -L https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250901-p2.sqlite > \
+    db/babel-20250901-p2.sqlite
 ```
 
 # Running the type checks, lint checks, dead code checks, and unit tests:
@@ -266,8 +262,8 @@ tests, you will see a ` urllib.error.URLError` runtime error.
 
 # How to run just the unit test suite
 First, you need to make sure that underneath the top-level
-"stitch" directory, there is a subdirectory "db" containing 
-the `babel-20250901-p1.sqlite` file (see section 
+`stitch-proj` directory, there is a subdirectory `db` containing 
+the Babel sqlite file (see section 
 "Downloading a pre-built Babel sqlite database file").
 Then you can run the unit test suite, like this:
 ```
@@ -299,7 +295,7 @@ source venv/bin/activate
 Use the `ingest_babel.py` script to generate the `ddl.sql` file as follows: 
 ```
 cd stitch-proj
-venv/bin/python3 stitch/ingest_babel.sql --print-ddl --dry-run 2>ddl.sql 
+venv/bin/python3 stitch/ingest_babel.py --print-ddl --dry-run 2>ddl.sql 
 ``` 
 On macOS, run the DbVisualizer application (free version
 24.3.3). If you don't see "SQLite" in the treeview control on the left, then
@@ -319,7 +315,7 @@ venv/bin/python3 stitch/row_counts.py babel.sqlite
 ```
 
 # Special instructions for running `ingest_babel.py` in an `i4i` instance with a local SSD
-[The instructions below are have been coded up in the experimental script
+[The instructions below have been coded up in the experimental script
 `tools/setup-i4i-instance.sh`.] The `i4i` series EC2 instances have local SSD storage
 that is ephemeral, i.e., the SSD volume must be set up anew each time the instance
 is started up. The `i4i.2xlarge` instance that we typically use for Babel ingests is 
@@ -377,121 +373,65 @@ This section describes the complete process used to package and publish `stitch-
 
 ## 1. Project Structure
 
-The project uses a `src/` layout, which is the recommended modern packaging structure:
+The project uses a flat layout: the Python package `stitch/` sits at the
+repository root (no `src/` directory):
 
 ```
-stitch-core/
+stitch-proj/
 ├── pyproject.toml
 ├── README.md
 ├── LICENSE
-├── src/
-│   └── stitch_proj/
-│       ├── __init__.py
-│       ├── ingest_babel.py
-│       ├── local_babel.py
-│       ├── row_counts.py
-│       └── stitchutils.py
+├── requirements.txt
+├── requirements-dev.txt
+├── run-setup-venv.sh
+├── stitch/
+│   ├── __init__.py
+│   ├── babel_schema.py
+│   ├── ingest_babel.py
+│   ├── local_babel.py
+│   ├── row_counts.py
+│   └── stitchutils.py
 ├── tests/
-└── dist/
+├── tools/
+└── old-tools/
 ```
 
 Key points:
 
-- All importable code lives under `src/stitch_proj/`
+- All importable code lives under `stitch/`
 - Tests are outside the package (see `tests/`)
-- PyPI distribution artifacts are generated into `dist/`
+- PyPI distribution artifacts are generated into `dist/` (created at build time)
 - Metadata and build configuration live in `pyproject.toml`
 
 ---
 
 ## 2. pyproject.toml Configuration
 
-Packaging is defined entirely in `pyproject.toml` (PEP 517/518/621 compliant).
+Packaging is defined entirely in
+[`pyproject.toml`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/pyproject.toml)
+(PEP 517/518/621 compliant). See that file for the authoritative configuration;
+at a high level it covers:
 
-It specifies:
-
-- Build system (`setuptools`, `wheel`)
-- Project name
-- Version
-- Description
-- Authors
-- License
-- Python version requirement (>= 3.12)
-- Dependencies
-- Optional development dependencies
-- Package discovery via `src`
-
-Example critical sections:
-
-```toml
-[build-system]
-requires = ["setuptools>=61"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "stitch-proj"
-version = "0.1.0"
-authors = [
-  { name="First Last", email="example@example.com" },
-]
-
-maintainers = [
-  { name="First Last", email="example@example.com" },
-]
-
-description = "the description for the package. Should be just a few sentencees"
-readme = "README.md"
-requires-python = ">=3.12"
-license = { file = "LICENSE" }
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
-    "Development Status :: 3 - Alpha",
-]
-
-dependencies = [
- list general dependencies, everyone will need to run the app here
-]
-
-[project.optional-dependencies]
-dev = [
-list dependencies only devs will need to run the app here
-]
-
-[project.urls]
-Homepage = "github repository where the code for this package lives"
-Issues = "where issues should be documented"
-
-[project.scripts]
-ingest-babel = "stitch_proj.ingest_babel:_main"
-
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["stitch_proj*"]
-
-[tool.ruff]
-target-version = "py312"
-line-length = 88
-
-[tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP"]
-ignore = []
-
-[tool.pytest.ini_options]
-pythonpath = ["src"]
-testpaths = ["tests"]
-```
+- Build system (`setuptools`)
+- Project metadata (name, version, Python version requirement)
+- Package discovery
+- Console scripts (e.g., `ingest-babel`)
+- Tool configuration for `ruff` and `pytest`
 
 ---
 
 ## 3. Install Build Tools
 
-Before building:
-
+You should already have the PyPI packages `build` and `twine` in your virtualenv from
+having run `run-setup-venv.sh --dev`, and thus you just need to activate your virtualenv:
+```
+source venv/bin/activate
+```
+But if you need to manually install them for some reason, the command would be:
 ```bash
 python -m pip install --upgrade build twine
 ```
-
+The `build` and `twine` packages each perform a key function in the build process:
 - `build` generates distributions
 - `twine` uploads to PyPI
 
@@ -561,10 +501,13 @@ After upload:
 pip install stitch-proj
 ```
 
-Or for development:
+For development work, clone the repository and install the dev dependencies
+from `requirements-dev.txt`:
 
 ```bash
-pip install stitch-proj[dev]
+git clone https://github.com/Translator-CATRAX/stitch-proj.git
+cd stitch-proj
+./run-setup-venv.sh --dev
 ```
 
 ---
@@ -590,17 +533,19 @@ When releasing a new version:
 ---
 
 # Python distribution package requirements 
-All external PyPI distribution package requirements for the `stitch-proj` project are listed in the
-[`requirements.txt`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/requirements.txt) file.  
+External PyPI distribution package requirements for the `stitch-proj` project are split across two files:
+[`requirements.txt`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/requirements.txt)
+contains the runtime dependencies needed to _use_ the software (for either querying or
+ingesting Babel), and
+[`requirements-dev.txt`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/requirements-dev.txt)
+contains the additional packages needed only when _developing_ `stitch-proj` (e.g., for running
+`run-checks.sh`, or for building and uploading a release to PyPI).
 The `run-checks.sh` script (see section "Running
-the type checks, lint checks, ..." below) depends on the packages `pytest`,
-`ruff`, `vulture`, and `pylint`.  For a "querying" type user that is just using
-`local_babel.py`, only three PyPI distribution packages are needed, `requests`,
-`numpy`, and the Biolink Model Toolkit (`bmt`). Additionally, for an "ingester"
-type user who wants to run `ingest_babel.py` to build a local Babel sqlite
-database from scratch, the PyPI packages `pandas`, `ray`, and
-`htmllistparse` are needed. The `requirements.txt` file contains
-the full set of dependencies.
+the type checks, lint checks, ..." above) depends on the packages `pytest`,
+`ruff`, `vulture`, and `pylint`, all of which are listed in `requirements-dev.txt`.
+The `requirements.txt` file contains the full set of runtime dependencies
+(`bmt`, `htmllistparse`, `pandas`, and `requests`); developers should install
+both files (or just use `run-setup-venv.sh --dev`).
 
 # How to cite Babel in a publication
 Please see the [Babel `CITATION.cff` file](https://github.com/TranslatorSRI/Babel/blob/master/CITATION.cff).
