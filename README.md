@@ -106,7 +106,6 @@ pull them in automatically; for now, install them explicitly with
 
 # Setup of a python virtualenv for using the `stitch` software
 You can just run
->>>>>>> 49796fe22c40201ece5b606d07d82c03b44cc8b2
 ```
 cd stitch-proj
 ./run-setup-venv.sh
