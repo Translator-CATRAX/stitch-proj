@@ -82,7 +82,7 @@ import tempfile
 import time
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
-from typing import IO, Any, Iterable, Optional, cast, overload
+from typing import IO, Any, Iterable, Optional, Protocol, TypeAlias, cast, overload
 from urllib.parse import urljoin
 
 import numpy
@@ -97,6 +97,41 @@ from stitch.babel_schema import (
 )
 
 ChunkType = pd.DataFrame | list[str]
+
+# Type aliases for the callable-passing patterns used in the ingest pipeline.
+# A chunk-processing callable: takes one chunk of input data and performs
+# all the side-effecting database INSERTs for that chunk. The argument type
+# differs by factory -- compendia factories produce callables that accept
+# pd.DataFrame; conflation factories produce callables that accept list[str].
+# The alias uses `...` instead of `[ChunkType]` because Callable parameters
+# are contravariant: a `Callable[[pd.DataFrame], None]` is not assignable to
+# `Callable[[ChunkType], None]`. In practice each factory's return value is
+# paired with a `read_chunks` source that yields the matching chunk type.
+ProcessChunk: TypeAlias = Callable[..., None]
+# A factory that turns a kwargs dict into a ProcessChunk (e.g.,
+# `_make_compendia_chunk_processor`, `_make_conflation_chunk_processor`).
+MakeChunkProcessor: TypeAlias = Callable[..., ProcessChunk]
+# A builder that produces the kwargs dict for the above, given a file name
+# (e.g., `_get_make_chunkproc_args_compendia`,
+# `_get_make_chunkproc_args_conflation`).
+MakeChunkProcArgs: TypeAlias = Callable[[str], dict[str, Any]]
+
+class IngestFromUrl(Protocol):  # pylint: disable=too-few-public-methods
+    """A callable that drives the per-chunk ingest of a single remote URL.
+
+    Returned by `_make_url_ingester`. Implemented by the nested
+    `ingest_from_url` closure. Using a Protocol (rather than a plain
+    `Callable[..., int]`) lets callers invoke it with keyword arguments,
+    which is how it is called at the one consumer site in `ingest_urls`.
+    """
+
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def __call__(self,
+                 url: str,
+                 temp_dir: Path,
+                 process_chunk: ProcessChunk,
+                 total_size: Optional[int] = None,
+                 glbl_chnk_cnt: int = 0) -> int: ...
 
 DEFAULT_BABEL_RELEASE_URL =  'https://stars.renci.org/var/babel_outputs/2025sep1/'
 DEFAULT_BABEL_COMPENDIA_URL = urljoin(DEFAULT_BABEL_RELEASE_URL, 'compendia/')
@@ -326,7 +361,7 @@ def _curies_to_pkids(cursor: sqlite3.Cursor,
     return dict(rows)
 
 def _make_conflation_chunk_processor(conn: sqlite3.Connection,
-                                     conflation_type_id: int) -> Callable:
+                                     conflation_type_id: int) -> ProcessChunk:
     if conflation_type_id not in ALLOWED_CONFLATION_TYPES:
         raise ValueError(f"invalid conflation_type value: {conflation_type_id};"
                          f"it must be in the set: {ALLOWED_CONFLATION_TYPES}")
@@ -573,12 +608,12 @@ def _do_log_work(start_times: tuple[float, float],
 def _make_url_ingester(conn: sqlite3.Connection,
                        lines_per_chunk: int,
                        read_chunks: Callable[[str, int, Path], Iterable[ChunkType]],
-                       log_work: bool = False) -> Callable:
+                       log_work: bool = False) -> IngestFromUrl:
     chunks_per_analyze_list: list[int] = \
         [int(x) for x in numpy.ceil(numpy.array(ROWS_PER_ANALYZE)/lines_per_chunk)]
     def ingest_from_url(url: str,
                         temp_dir: Path,
-                        process_chunk: Callable[[ChunkType], None],
+                        process_chunk: ProcessChunk,
                         total_size: Optional[int] = None,
                         glbl_chnk_cnt: int = 0) -> int:
         chunk_ctr = 0
@@ -783,8 +818,9 @@ def _make_ingest_urls(dry_run: bool) -> Callable:
     # pylint: disable=too-many-arguments,too-many-positional-arguments
     def ingest_urls(
             file_names: Iterable[str], file_map: dict[str, FileEntry], file_type: str,
-            base_url: str, ingest_url: Callable, start_time_sec: float,
-            make_chunk_processor: Callable, get_make_chunk_processor_args: Callable,
+            base_url: str, ingest_url: IngestFromUrl, start_time_sec: float,
+            make_chunk_processor: MakeChunkProcessor,
+            get_make_chunk_processor_args: MakeChunkProcArgs,
             glbl_chnk_cnt: int, temp_dir: Path) -> int:
         _log_print(f"ingesting {file_type} files at: " +
                    (base_url if base_url != "" else "(local)"))
@@ -802,7 +838,7 @@ def _make_ingest_urls(dry_run: bool) -> Callable:
         return glbl_chnk_cnt
     return ingest_urls
 
-def _make_get_make_chunkproc_args_compendia(insrt_msng_taxa: bool) -> Callable:
+def _make_get_make_chunkproc_args_compendia(insrt_msng_taxa: bool) -> MakeChunkProcArgs:
     return functools.partial(_get_make_chunkproc_args_compendia,
                              insrt_msng_taxa)
 
