@@ -14,7 +14,7 @@ BABEL_CONFLATION_BASE_URL=${BABEL_BASE_URL}/conflation/
 # a file literally named "DrugChemical.txt" -- the filename is hardcoded in
 # ingest_babel.py:TEST_3_CONFLATION).
 TEST_ARTIFACTS_DIR=${STITCH_DIR}/test-artifacts
-INGEST_BABEL_CMD=ingest-babel
+INGEST_BABEL_CMD=venv/bin/ingest-babel
 
 rm -f ${STITCH_LOG_FILE}
 
