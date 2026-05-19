@@ -7,7 +7,10 @@ The ingest tools automatically download Babel using "compendia" and "conflation"
 # Table of Contents
 
 - [Introduction](#introduction)
+- [Quick-start: querier](#quick-start-querier)
+- [Quick-start: ingester](#quick-start-ingester)
 - [Tools](#tools)
+- [Releases](#releases)
 - [Subdirectories in `stitch-proj`](#subdirectories-in-stitch-proj)
 - [Requirements](#requirements)
 - [Systems on which this software has been tested](#systems-on-which-this-software-has-been-tested)
@@ -15,7 +18,7 @@ The ingest tools automatically download Babel using "compendia" and "conflation"
   - [Ubuntu/Graviton](#ubuntugraviton)
   - [MacOS/Apple Silicon](#macosapple-silicon)
 - [Downloading a pre-built Babel sqlite database file](#downloading-a-pre-built-babel-sqlite-database-file)
-- [Setting up local Babel sqlite database so you can run the unit tests](#setting-up-local-babel-sqlite-database-so-you-can-run-the-unit-tests)
+  - [Where to place the file](#where-to-place-the-file)
 - [Installing stitch-proj from PyPI](#installing-stitch-proj-from-pypi)
 - [How to use the local Babel sqlite database](#how-to-use-the-local-babel-sqlite-database)
 - [The local Babel sqlite database schema](#the-local-babel-sqlite-database-schema)
@@ -29,39 +32,98 @@ The ingest tools automatically download Babel using "compendia" and "conflation"
 - [How to run the integration tests of `ingest_babel.py`](#how-to-run-the-integration-tests-of-ingest_babelpy)
 - [Analyzing the local Babel sqlite database](#analyzing-the-local-babel-sqlite-database)
 - [How to regenerate the schema diagram](#how-to-regenerate-the-schema-diagram)
-- [To print out the table row counts](#to-print-out-the-table-row-counts)
+- [Inspecting a built Babel sqlite database file](#inspecting-a-built-babel-sqlite-database-file)
 - [Packaging Process for `stitch-proj`](#packaging-process-for-stitch-proj)
-  - [Project Structure](#1-project-structure)
-  - [pyproject.toml Configuration](#2-pyprojecttoml-configuration)
-  - [Install Build Tools](#3-install-build-tools)
-  - [Build the Package](#4-build-the-package)
-  - [Verify the Package](#5-verify-the-package)
+  - [Project structure](#1-project-structure)
+  - [pyproject.toml configuration](#2-pyprojecttoml-configuration)
+  - [Install build tools](#3-install-build-tools)
+  - [Build the package](#4-build-the-package)
+  - [Verify the package](#5-verify-the-package)
   - [Upload to PyPI](#6-upload-to-pypi)
-  - [Install From PyPI](#7-install-from-pypi)
-  - [Versioning Workflow](#8-versioning-workflow)
-- [Miscellaneous tasks](#miscellaneous-tasks)
-  - [After I build the sqlite ingest of Babel, how to get its size in GiB?](#after-i-build-the-sqlite-ingest-of-babel-how-to-get-its-size-in-gib)
+  - [Install from PyPI](#7-install-from-pypi)
+  - [Versioning workflow](#8-versioning-workflow)
+- [Glossary](#glossary)
+- [Contributing](#contributing)
+- [License](#license)
 - [How to cite Babel in a publication](#how-to-cite-babel-in-a-publication)
 
-# Introduction 
-There are two types of intended users for the `stitch-proj` software: someone who is
-tasked with ingesting the
-[Babel concept identifier normalization database](https://github.com/TranslatorSRI/Babel)
-into a local sqlite database (an "ingester") and someone developing an
-application, such as a BigKG build system, that wants to programmatically query
-a local Babel sqlite database for node normalization, etc. ("querier"). The
-"ingester" type user will need to read this entire README document, in order to
-be able to set up and run the `ingest_babel.py` program to carry out an ingest
-of Babel into a local sqlite database. The "querier" type user can skip over the
-sections of this document that discuss ingesting Babel, and focus on the
-sections about downloading the pre-built Babel sqlite database from S3 and using
-the `local_babel.py` python module that provides functions for querying the
-local Babel sqlite database.
+# Introduction
+There are two types of intended user for the `stitch-proj` software:
+
+- An **"ingester"** is someone tasked with building a local sqlite copy of
+  the [Babel concept identifier normalization database](https://github.com/TranslatorSRI/Babel)
+  from scratch, by running `ingest_babel.py`.
+- A **"querier"** is someone developing an application (such as a BigKG
+  build system) that wants to programmatically query a local Babel sqlite
+  database, via the `local_babel.py` module, for node normalization or
+  related lookups.
+
+The two quick-start sections below give the shortest recipe for each
+role; the remainder of this README is organized to support both, with
+the querier path covered first.
+
+# Quick-start: querier
+If you just want to _query_ a pre-built Babel sqlite database from a Python
+application (~250 GiB free disk required; see [Requirements](#requirements)):
+
+```bash
+# 1. Install stitch-proj from PyPI (Python 3.12+); runtime deps install automatically.
+pip install stitch-proj
+
+# 2. Download the pre-built Babel sqlite file (~217 GiB) to a location of your choice.
+curl -s -L https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250901-p2.sqlite \
+    > babel-20250901-p2.sqlite
+```
+
+Then from Python:
+
+```python
+import stitch.local_babel as lb
+
+conn = lb.connect_to_db_read_only("babel-20250901-p2.sqlite")
+res = lb.map_curie_to_preferred_curies(conn, "MESH:D014867")
+# → (("CHEBI:15377", "biolink:SmallMolecule", "MESH:D014867"),)
+```
+
+See the section
+"[How to use the local Babel sqlite database](#how-to-use-the-local-babel-sqlite-database)"
+below for the full `local_babel` API summary.
+
+# Quick-start: ingester
+If you want to _build_ a Babel sqlite database from scratch (~37 hours, ~600 GiB
+free disk, ≥32 GiB RAM; see [Requirements](#requirements)):
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/Translator-CATRAX/stitch-proj.git
+cd stitch-proj
+
+# 2. Create a virtualenv (include `--dev` if you also plan to run unit tests)
+./run-setup-venv.sh
+
+# 3. Edit `run-ingest-aws.sh` and set BABEL_BASE_URL to the desired Babel release
+
+# 4. Kick off the ingest (~37 hours)
+./run-ingest-aws.sh
+```
+
+For full step-by-step AWS instructions (including the `screen`/memory-tracker
+wrappers), see
+"[How to run the stitch-proj Babel sqlite ingest in AWS](#how-to-run-the-stitch-proj-babel-sqlite-ingest-in-aws)"
+below.
 
 # Tools
 - `ingest_babel.py`: downloads and ingests the Babel concept identifier synonymization database into a local sqlite3 relational database
 - `local_babel.py`: functions for querying the local Babel sqlite database
 - `row_counts.py`: a script that prints out the row counts of the tables in the local Babel sqlite database
+- `babel_schema.py`: DDL constants (the `CREATE TABLE` statements and index work-plan) for the Babel sqlite database, shared between `ingest_babel.py` and `local_babel.py`
+- `stitchutils.py`: utility functions used internally by the other modules (Biolink Model category lookups, argparse helpers, NaN normalization, time/duration formatting, and a timestamped stderr logger)
+
+# Releases
+Tagged releases — including the pre-built Babel sqlite database files
+referenced throughout this document — are published on the project's
+[Releases page](https://github.com/Translator-CATRAX/stitch-proj/releases),
+along with download links, file sizes, and MD5 checksums.
 
 # Subdirectories in `stitch-proj`
 - `stitch`: python modules for `stitch-proj`, that are meant to be imported and used
@@ -76,7 +138,7 @@ local Babel sqlite database.
   - To build `babel.sqlite`, at least 600 GiB of free file system storage space (usage transiently spikes to ~522 GiB and then the final database size is ~181 GiB).
   - To use a local `babel.sqlite` in your application, 250 GiB of free system storage space to store the sqlite file.
 - Linux or MacOS (this software has not been tested on Windows; see "Systems on which this software has been tested").
-- If you want to download the pre-built Babel sqlite database file, you will need to have `curl` or `wget` installed.
+- If you want to download the pre-built Babel sqlite database file, you will need to have `curl` installed.
 - Optionally, you can install `sqlite3_analyzer`, if you want to obtain detailed database statistics (see instructions below in this page).
 
 # Systems on which this software has been tested
@@ -89,7 +151,7 @@ The `stitch-proj` project's module `ingest_babel.py` has been tested in three co
 - `gp3` root volume (500 GiB)
 - `Nitro SSD` volume (1.7 TiB)
 
-## Ubuntu/Graviton 
+## Ubuntu/Graviton
 - We have tested a full run of `ingest_babel.py` on this system ([release `babel-sqlite-20250123`](https://github.com/Translator-CATRAX/stitch-proj/releases/tag/babel-20250123)).
 - Ubuntu 24.04
 - `c7g.4xlarge` instance (Graviton3 processor, which is ARM64 architecture), 32 GiB of memory
@@ -110,29 +172,34 @@ the Graviton3 processor. Testing has been done on the following MacOS system:
 
 # Downloading a pre-built Babel sqlite database file
 [`babel-20250901-p2.sqlite`](https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250901-p2.sqlite)
-(217 GiB) is available for download from AWS S3.  For details and an MD5
-checksum hash, see the [Releases page](https://github.com/Translator-CATRAX/stitch-proj/releases) for the stitch
-project. You will need to download (or, alternatively, build from scratch using
-`ingest_babel.py`) this file in order to be able to run the unit test 
-suite. The "-p2" on the downloadable sqlite database indicates that
-the database has been patched twice, once to add the `is_canonical` column
-to the `conflation_members` table 
+(217 GiB) is available for download from AWS S3. For details and an MD5
+checksum hash, see the [Releases page](https://github.com/Translator-CATRAX/stitch-proj/releases)
+for the stitch project. You will need to download this file (or, alternatively,
+build it from scratch using `ingest_babel.py`) in order to query Babel
+locally or to run the unit test suite. The "-p2" on the downloadable
+sqlite database indicates that the database has been patched twice: once
+to add the `is_canonical` column to the `conflation_members` table
 (see [stitch-proj issue 80](https://github.com/Translator-CATRAX/stitch-proj/issues/80)),
-and a second time in order to create an index on the column `desc` in the `descriptions` 
-table (see [stitch-proj issue 87](https://github.com/Translator-CATRAX/stitch-proj/issues/87)).
+and a second time to create an index on the column `desc` in the
+`descriptions` table
+(see [stitch-proj issue 87](https://github.com/Translator-CATRAX/stitch-proj/issues/87)).
 
-# Setting up local Babel sqlite database so you can run the unit tests:
-First, download the Babel sqlite file from S3 as described above, and ensure
-that in the top-level `stitch-proj` directory, there is a symbolic link `db` or
-a subdirectory `db` such that if the current working directory is the top-level
-`stitch-proj` directory, the relative path `db/babel-VERSION.sqlite` can open
-the database file.  Something like this should do it:
+## Where to place the file
+A querier can put the file anywhere and pass the path to
+`stitch.local_babel.connect_to_db_read_only`. **For running the unit
+test suite**, however, the file must be reachable at the relative path
+`db/<filename>` from the top-level `stitch-proj` directory. The easiest
+way to satisfy that is:
+
 ```
 cd stitch-proj
 mkdir -p db
 curl -s -L https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250901-p2.sqlite > \
     db/babel-20250901-p2.sqlite
 ```
+
+A symbolic link `db -> /some/other/path` also works, if you want to keep
+the 217 GiB file off the volume hosting `stitch-proj`.
 
 # Installing stitch-proj from PyPI
 
@@ -157,21 +224,95 @@ import stitch.local_babel as lb
 ```
 
 The `stitch-proj` package has the following runtime PyPI distribution package
-dependencies (see [`requirements.txt`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/requirements.txt)):
+dependencies (see [`requirements.txt`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/requirements.txt)),
+which are installed automatically by `pip install stitch-proj`:
 
-- bmt >= 1.4.5  
-- htmllistparse >= 0.6.1  
-- requests >= 2.32.5  
-- pandas >= 2.2.3  
+- bmt >= 1.4.5
+- htmllistparse >= 0.6.1
+- requests >= 2.32.5
+- pandas >= 2.2.3
 
-Note that `pyproject.toml` does not currently declare these in a
-`[project] dependencies` table, so `pip install stitch-proj` will _not_
-pull them in automatically; for now, install them explicitly with
-`pip install -r requirements.txt` (after cloning the repository) or
-`pip install bmt htmllistparse pandas requests`.
+`pyproject.toml` reads these specs dynamically from `requirements.txt` (via
+`[tool.setuptools.dynamic]`), so the requirements file remains the single
+source of truth for runtime dependencies.
 
 # How to use the local Babel sqlite database
-For now, see the module `tests/test_local_babel.py` for examples.
+
+The `stitch.local_babel` module exposes functions for querying a locally
+ingested Babel sqlite database. The basic pattern is to open the database
+in read-only mode and call query functions against the resulting
+connection (or, for batch operations, pass the database filename directly
+so each worker process can open its own connection):
+
+```python
+import stitch.local_babel as lb
+
+conn = lb.connect_to_db_read_only("db/babel-20250901-p2.sqlite")
+
+# Resolve a CURIE to its preferred CURIE(s) and type(s):
+res = lb.map_curie_to_preferred_curies(conn, "MESH:D014867")
+# → (("CHEBI:15377", "biolink:SmallMolecule", "MESH:D014867"),)
+
+# All CURIEs in the same clique as a preferred CURIE:
+synonyms = lb.map_pref_curie_to_synonyms(conn.cursor(), "CHEBI:15377")
+```
+
+## Main public functions
+
+**Connection**
+- `connect_to_db_read_only(db_filename) -> sqlite3.Connection` — opens the
+  database in URI read-only mode (`file:...?mode=ro`), which is safe for
+  concurrent readers including worker processes in a `multiprocessing.Pool`.
+
+**Preferred-identifier resolution (CURIE → preferred CURIE / type)**
+- `map_curie_to_preferred_curies(conn, curie)` — single CURIE; returns
+  tuples of `(preferred_curie, type_curie, input_curie)`.
+- `map_curies_to_preferred_curies(db_filename, curies, pool=None)` — batch
+  variant; if a `multiprocessing.Pool` is supplied, batches are processed
+  in parallel.
+
+**Conflation neighbors (CURIE → CURIEs in the same conflation cluster)**
+- `map_curie_to_conflation_curies(conn, curie, conflation_type=None)` —
+  single CURIE; optionally filter by conflation type (`"DrugChemical"` or
+  `"GeneProtein"`).
+- `map_curies_to_conflation_curies(db_filename, curies, pool=None)` — batch
+  variant with optional parallelism.
+
+**Clique metadata**
+- `map_preferred_curie_to_cliques(conn, curie) -> tuple[CliqueInfo, ...]` —
+  clique rows for a preferred CURIE.
+- `map_any_curie_to_cliques(conn, curie) -> tuple[CliqueInfo, ...]` —
+  clique rows reachable from any CURIE (preferred or secondary).
+- `map_pref_curie_to_synonyms(cursor, pref_curie) -> set[str]` — every
+  CURIE in the same clique as the preferred CURIE.
+
+**Names, categories, taxa**
+- `get_all_names_for_curie(conn, curie) -> tuple[str, ...]` — every
+  non-empty name (`label` / `preferred_name`) associated with the CURIE.
+- `get_categories_for_curie(conn, curie) -> tuple[str, ...]` — every type
+  CURIE associated with the CURIE (via clique and conflation).
+- `get_taxon_for_gene_or_protein(conn, curie) -> Optional[str]` — taxon
+  CURIE for a gene/protein identifier, if one exists.
+
+**Sampling and counts**
+- `get_n_random_curies(db_filename, n, pool) -> tuple[str, ...]` — `n`
+  random CURIEs from the `identifiers` table (intended for test-data
+  generation).
+- `get_table_row_counts(conn) -> dict[str, int]` — row count for each
+  user table in the database.
+
+## Return-type containers
+
+The module defines two `TypedDict` containers for structured return values:
+
+- `IdentifierInfo` — `{identifier, description, label}` for a primary
+  identifier.
+- `CliqueInfo` — `{id: IdentifierInfo, ic: float, type: list[str]}` for a
+  single clique.
+
+For complete usage examples — including batched parallel queries against
+the local database — see the unit-test module
+[`tests/test_local_babel.py`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/tests/test_local_babel.py).
 
 # The local Babel sqlite database schema
 This schema diagram was generated using [DbVisualizer](https://www.dbvis.com) Free version 24.3.3.
@@ -256,7 +397,7 @@ This behavior cannot be overridden at the `python3.12` command-line.
 
 # Special instructions for running `ingest_babel.py` in an `i4i` instance with a local SSD
 [The instructions below have been coded up in the experimental script
-`tools/setup-i4i-instance.sh`.] The `i4i` series EC2 instances have local SSD storage
+[`tools/setup-i4i-instance.sh`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/tools/setup-i4i-instance.sh).] The `i4i` series EC2 instances have local SSD storage
 that is ephemeral, i.e., the SSD volume must be set up anew each time the instance
 is started up. The `i4i.2xlarge` instance that we typically use for Babel ingests is 
 `stitch2.rtx.ai`.
@@ -327,7 +468,7 @@ which will run type checks (using `mypy`), lint checks (using `ruff`),
 dead code tests (using `vulture`), and unit tests (using `pytest`).
 Note that some of the unit tests require Internet connectivity; if
 you do not have a working Internet connection, and if you run the unit
-tests, you will see a ` urllib.error.URLError` runtime error.
+tests, you will see a `urllib.error.URLError` runtime error.
 
 # How to run just the unit test suite
 First, you need to make sure that underneath the top-level
@@ -403,20 +544,26 @@ database. In the treeview control under "SQLite" on the left, open
 pane, click on the "References" tab. Use macOS system screen-capture tool to
 obtain a PNG of the schema diagram.
 
-# To print out the table row counts
-Run these steps:
+# Inspecting a built Babel sqlite database file
+After building (or downloading) a Babel sqlite database, the following
+quick checks are sometimes useful.
+
+To print the row counts of every table:
 ```
 cd stitch-proj
 venv/bin/python3 stitch/row_counts.py babel.sqlite
+```
+
+To get the file size in GiB (Linux/GNU `stat`):
+```
+stat -c %s babel.sqlite | awk '{printf "%.2f GiB\n", $1/1024/1024/1024}'
 ```
 
 # Packaging Process for `stitch-proj`
 
 This section describes the complete process used to package and publish `stitch-proj` to PyPI.
 
----
-
-## 1. Project Structure
+## 1. Project structure
 
 The project uses a flat layout: the Python package `stitch/` sits at the
 repository root (no `src/` directory):
@@ -448,9 +595,7 @@ Key points:
 - PyPI distribution artifacts are generated into `dist/` (created at build time)
 - Metadata and build configuration live in `pyproject.toml`
 
----
-
-## 2. pyproject.toml Configuration
+## 2. pyproject.toml configuration
 
 Packaging is defined entirely in
 [`pyproject.toml`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/pyproject.toml)
@@ -463,9 +608,7 @@ at a high level it covers:
 - Console scripts (e.g., `ingest-babel`)
 - Tool configuration for `ruff` and `pytest`
 
----
-
-## 3. Install Build Tools
+## 3. Install build tools
 
 You should already have the PyPI packages `build` and `twine` in your virtualenv from
 having run `run-setup-venv.sh --dev`, and thus you just need to activate your virtualenv:
@@ -480,9 +623,7 @@ The `build` and `twine` packages each perform a key function in the build proces
 - `build` generates distributions
 - `twine` uploads to PyPI
 
----
-
-## 4. Build the Package
+## 4. Build the package
 
 From the project root:
 
@@ -503,9 +644,7 @@ Artifacts:
 - `.whl` → wheel (binary distribution)
 - `.tar.gz` → source distribution (sdist)
 
----
-
-## 5. Verify the Package
+## 5. Verify the package
 
 Optional but recommended:
 
@@ -514,8 +653,6 @@ twine check dist/*
 ```
 
 This validates metadata and README rendering.
-
----
 
 ## 6. Upload to PyPI
 
@@ -536,9 +673,7 @@ Example using token:
 twine upload -u __token__ -p <your-token> dist/*
 ```
 
----
-
-## 7. Install From PyPI
+## 7. Install from PyPI
 
 After upload:
 
@@ -555,9 +690,7 @@ cd stitch-proj
 ./run-setup-venv.sh --dev
 ```
 
----
-
-## 8. Versioning Workflow
+## 8. Versioning workflow
 
 When releasing a new version:
 
@@ -575,15 +708,88 @@ When releasing a new version:
    twine upload dist/*
    ```
 
----
+# Glossary
 
-# Miscellaneous tasks
+Several terms appear repeatedly in this README and in the `stitch-proj`
+codebase. Most originate in the
+[Babel](https://github.com/TranslatorSRI/Babel) project and the
+[Biolink Model](https://biolink.github.io/biolink-model/); the
+definitions below describe how they are used in this project specifically.
 
-## After I build the sqlite ingest of Babel, how to get its size in GiB?
-Like this:
-```
-stat -c %s babel-20250817.sqlite | awk '{printf "%.2f GiB\n", $1/1024/1024/1024}'
-```
+- **CURIE** — a *compact URI*, an identifier of the form `prefix:localid`
+  (e.g., `MESH:D014867`, `CHEBI:15377`, `NCBIGene:7157`). CURIEs are the
+  standard identifier syntax used throughout the Babel sqlite database.
+
+- **Identifier** — a single CURIE in the `identifiers` table that refers
+  to one biomedical concept (a "node", in graph terms). Each identifier
+  has an optional human-readable label. Multiple identifiers can refer
+  to the same underlying concept; they are grouped together as a clique
+  (see below).
+
+- **Clique** — a set of identifiers all considered synonymous (referring
+  to the same concept). In the database, each row of the `cliques` table
+  represents one clique; its members are linked via the
+  `identifiers_cliques` join table, and the clique's representative
+  identifier is recorded as `primary_identifier_id`.
+
+- **Preferred CURIE** (also called the **primary identifier** in some
+  contexts, including the database schema) — the canonical CURIE chosen
+  to represent a clique: the CURIE of the identifier referenced by the
+  clique's `primary_identifier_id`. When you call
+  `map_curie_to_preferred_curies(conn, some_curie)`, the returned tuple's
+  first element is the preferred CURIE of the clique to which `some_curie`
+  belongs.
+
+- **Category / type** — the high-level Biolink type of a clique (e.g.,
+  `biolink:SmallMolecule`, `biolink:Protein`, `biolink:Gene`). In the
+  Biolink Model these are called **categories**; in the `stitch-proj`
+  database and Python code they are called **types** (see the `types`
+  table and the `type_id` column on `cliques`). The two terms refer to
+  the same concept.
+
+- **Compendium** (plural: **compendia**) — a Babel distribution file
+  (typically JSON-lines) containing groups of synonymous identifiers,
+  each group representing one concept. Compendia are downloaded by
+  `ingest_babel.py` and parsed to populate the `cliques` and
+  `identifiers` tables in the local sqlite database.
+
+- **Conflation** — a higher-level equivalence that merges cliques across
+  different Biolink categories (e.g., grouping a gene with its
+  corresponding protein, or a drug with its active chemical compound).
+  Conflation files from Babel enumerate such groupings; in the local
+  database they are stored in `conflation_clusters` (one row per
+  conflation group) and `conflation_members` (joining identifiers to
+  their cluster). The two conflation types currently in use are
+  `DrugChemical` and `GeneProtein`.
+
+# Contributing
+External contributions are welcome.
+
+- **Issues / bug reports**: file at the
+  [issue tracker](https://github.com/Translator-CATRAX/stitch-proj/issues).
+- **External contributors**: fork the repository and open a pull request
+  from your fork.
+- **Team members**: use a branch-and-PR workflow against the upstream
+  repository. Self-merge is fine for the project owner.
+- **Setting up a development environment**: see
+  "[Setup of a python virtualenv...](#setup-of-a-python-virtualenv-for-using-or-developing-the-stitch-software)".
+- **Before submitting a PR**: run `./run-checks.sh` (which runs `mypy`,
+  `ruff`, `vulture`, and `pytest`); see
+  "[Running the type checks, lint checks, dead code checks, and unit tests](#running-the-type-checks-lint-checks-dead-code-checks-and-unit-tests)".
+  Larger changes should also pass `./run-integration-tests.sh`.
+  Note: the project does not currently have a continuous-integration
+  (CI) pipeline set up, so these local checks are the only safeguard
+  against breakage.
+- **Commit messages**: each commit should reference an issue number
+  (e.g., "fix off-by-one in clique mapper (#42)"), unless the commit
+  only touches documentation.
+- **Maintainer contact**: tag [@saramsey](https://github.com/saramsey)
+  on the relevant issue or PR.
+
+# License
+`stitch-proj` is distributed under the MIT License. See the
+[LICENSE](https://github.com/Translator-CATRAX/stitch-proj/blob/main/LICENSE)
+file for the full text.
 
 # How to cite Babel in a publication
 Please see the [Babel `CITATION.cff` file](https://github.com/TranslatorSRI/Babel/blob/master/CITATION.cff).
