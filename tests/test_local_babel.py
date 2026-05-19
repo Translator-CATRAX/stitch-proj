@@ -21,7 +21,7 @@ from stitch.local_babel import (
 
 @pytest.fixture(scope="session")
 def db_filename() -> str:
-    return "db/babel-20250901-p1.sqlite"
+    return "db/babel-20250901-p2.sqlite"
 
 @pytest.fixture(scope="function")
 def pool():
