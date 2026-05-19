@@ -136,7 +136,7 @@ along with download links, file sizes, and MD5 checksums.
 - CPython 3.12, which needs to be available in your path as `python3.12`, with the `venv` library installed and in the python path
 - At least 32 GiB of system memory
 - Sufficient disk space in wherever filesystem hosts your `stitch-proj` directory, which will depend on your use-case:
-  - To build `babel.sqlite`, at least 600 GiB of free file system storage space (usage transiently spikes to ~522 GiB and then the final database size is ~181 GiB).
+  - To build `babel.sqlite`, at least 600 GiB of free file system storage space (usage transiently spikes to ~522 GiB and then the final database size is ~217 GiB).
   - To use a local `babel.sqlite` in your application, 250 GiB of free system storage space to store the sqlite file.
 - Linux or MacOS (this software has not been tested on Windows; see "Systems on which this software has been tested").
 - If you want to download the pre-built Babel sqlite database file, you will need to have `curl` installed.
