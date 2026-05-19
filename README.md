@@ -42,6 +42,7 @@ The ingest tools automatically download Babel using "compendia" and "conflation"
   - [Upload to PyPI](#6-upload-to-pypi)
   - [Install from PyPI](#7-install-from-pypi)
   - [Versioning workflow](#8-versioning-workflow)
+- [Cleaning build artifacts](#cleaning-build-artifacts)
 - [Glossary](#glossary)
 - [Contributing](#contributing)
 - [License](#license)
@@ -695,9 +696,10 @@ cd stitch-proj
 When releasing a new version:
 
 1. Update version in `pyproject.toml`
-2. Remove old build artifacts:
+2. Remove old build artifacts using the project's clean script (see
+   "[Cleaning build artifacts](#cleaning-build-artifacts)" below):
    ```bash
-   rm -rf dist/ build/ src/*.egg-info
+   venv/bin/python tools/clean.py
    ```
 3. Rebuild:
    ```bash
@@ -707,6 +709,36 @@ When releasing a new version:
    ```bash
    twine upload dist/*
    ```
+
+# Cleaning build artifacts
+
+The script [`tools/clean.py`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/tools/clean.py)
+removes the local working-directory output produced by `python -m build`
+and `pip install -e .` -- specifically the `build/`, `dist/`, and
+`*.egg-info/` directories at the project root. Run it from the project
+root with:
+
+```bash
+venv/bin/python tools/clean.py
+```
+
+You should run it:
+
+- **Immediately before re-running `python -m build` to publish a new
+  release** (it is step 2 of the
+  [Versioning workflow](#8-versioning-workflow) above), so the new wheel
+  and source distribution are assembled from a clean staging tree.
+- **After switching git branches or after a rebase** that changes
+  package contents, to make sure the on-disk `*.egg-info/` metadata
+  matches the live source.
+- **Any time you notice stale duplicates** of project Python files
+  showing up under `build/lib/stitch/` (e.g., your editor's project
+  search finds two copies of the same function). These files are
+  snapshots from the last `python -m build`; cleaning them avoids
+  confusion.
+
+The script is idempotent and safe: if there is nothing to clean, it
+prints `nothing to clean; build artifacts already absent` and exits.
 
 # Glossary
 
