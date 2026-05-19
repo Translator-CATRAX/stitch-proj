@@ -92,10 +92,10 @@ import stitch_proj.local_babel as lb
 The `stitch-proj` package has the following runtime PyPI distribution package
 dependencies (see [`requirements.txt`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/requirements.txt)):
 
-- bmt == 1.4.5
-- htmllistparse == 0.6.1
-- pandas == 2.2.3
-- requests == 2.32.5
+- bmt >= 1.4.5  
+- htmllistparse >= 0.6.1  
+- requests >= 2.32.5  
+- pandas >= 2.2.3  
 
 Note that `pyproject.toml` does not currently declare these in a
 `[project] dependencies` table, so `pip install stitch-proj` will _not_
@@ -103,191 +103,10 @@ pull them in automatically; for now, install them explicitly with
 `pip install -r requirements.txt` (after cloning the repository) or
 `pip install bmt htmllistparse pandas requests`.
 
-# Packaging Process for `stitch-proj`
 
-This section describes the complete process used to package and publish `stitch-proj` to PyPI.
-
----
-
-## 1. Project Structure
-
-The project uses a `src/` layout, which is the recommended modern packaging structure:
-
-```
-stitch-core/
-├── pyproject.toml
-├── README.md
-├── LICENSE
-├── src/
-│   └── stitch_proj/
-│       ├── __init__.py
-│       ├── ingest_babel.py
-│       ├── local_babel.py
-│       ├── row_counts.py
-│       └── stitchutils.py
-├── tests/
-└── dist/
-```
-
-Key points:
-
-- All importable code lives under `src/stitch_proj/`
-- Tests are outside the package
-- Distribution artifacts are generated into `dist/`
-- Metadata and build configuration live in `pyproject.toml`
-
----
-
-## 2. pyproject.toml Configuration
-
-Packaging is defined entirely in
-[`pyproject.toml`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/pyproject.toml)
-(PEP 517/518/621 compliant). See that file for the authoritative configuration;
-at a high level it covers:
-
-- Build system (`setuptools`)
-- Project metadata (name, version, Python version requirement)
-- Package discovery
-- Console scripts (e.g., `ingest-babel`)
-- Tool configuration for `ruff` and `pytest`
-
----
-
-## 3. Install Build Tools
-
-You should already have the PyPI packages `build` and `twine` in your virtualenv from
-having run `run-setup-venv.sh --dev`, and thus you just need to activate your virtualenv:
-```
-source venv/bin/activate
-```
-But if you need to manually install them for some reason, the command would be:
-```bash
-python -m pip install --upgrade build twine
-```
-The `build` and `twine` packages each perform a key function in the build process:
-- `build` generates distributions
-- `twine` uploads to PyPI
-
----
-
-## 4. Build the Package
-
-From the project root:
-
-```bash
-python -m build
-```
-
-This generates:
-
-```
-dist/
-├── stitch_proj-0.1.0-py3-none-any.whl
-└── stitch_proj-0.1.0.tar.gz
-```
-
-Artifacts:
-
-- `.whl` → wheel (binary distribution)
-- `.tar.gz` → source distribution (sdist)
-
----
-
-## 5. Verify the Package
-
-Optional but recommended:
-
-```bash
-twine check dist/*
-```
-
-This validates metadata and README rendering.
-
----
-
-## 6. Upload to PyPI
-
-To upload to PyPI:
-
-```bash
-twine upload dist/*
-```
-
-You must have:
-
-- A PyPI account
-- An API token configured (recommended)
-
-Example using token:
-
-```bash
-twine upload -u __token__ -p <your-token> dist/*
-```
-
----
-
-## 7. Install From PyPI
-
-After upload:
-
-```bash
-pip install stitch-proj
-```
-
-For development work, clone the repository and install the dev dependencies
-from `requirements-dev.txt`:
-
-```bash
-git clone https://github.com/Translator-CATRAX/stitch-proj.git
-cd stitch-proj
-./run-setup-venv.sh --dev
-```
-
----
-
-## 8. Versioning Workflow
-
-When releasing a new version:
-
-1. Update version in `pyproject.toml`
-2. Remove old build artifacts:
-   ```bash
-   rm -rf dist/ build/ src/*.egg-info
-   ```
-3. Rebuild:
-   ```bash
-   python -m build
-   ```
-4. Upload:
-   ```bash
-   twine upload dist/*
-   ```
-
----
-
-
-# Python distribution package requirements 
-External PyPI distribution package requirements for the `stitch-proj` project are split across two files:
-[`requirements.txt`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/requirements.txt)
-contains the runtime dependencies needed to _use_ the software (for either querying or
-ingesting Babel), and
-[`requirements-dev.txt`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/requirements-dev.txt)
-contains the additional packages needed only when _developing_ `stitch-proj` (e.g., for running
-`run-checks.sh`, or for building and uploading a release to PyPI).
-The `run-checks.sh` script (see section "Running
-the type checks, lint checks, ..." below) depends on the packages `pytest`,
-`ruff`, `vulture`, and `pylint`, all of which are listed in `requirements-dev.txt`.
-For a "querying" type user that is just using
-`local_babel.py`, only three PyPI distribution packages are needed, `requests`,
-`numpy`, and the Biolink Model Toolkit (`bmt`). Additionally, for an "ingester"
-type user who wants to run `ingest_babel.py` to build a local Babel sqlite
-database from scratch, the PyPI packages `pandas`, `ray`, and
-`htmllistparse` are needed. The `requirements.txt` file contains
-the full set of runtime dependencies; developers should install both files
-(or use `run-setup-venv.sh --dev`).
-
-# Setup of a python virtualenv for using or developing the `stitch` software
-If you just want to _use_ the stitch software to run a Babel ingest, you can run
+# Setup of a python virtualenv for using the `stitch` software
+You can just run
+>>>>>>> 49796fe22c40201ece5b606d07d82c03b44cc8b2
 ```
 cd stitch-proj
 ./run-setup-venv.sh
@@ -550,6 +369,239 @@ Like this:
 ```
 stat -c %s babel-20250817.sqlite | awk '{printf "%.2f GiB\n", $1/1024/1024/1024}'
 ```
+
+# Packaging Process for `stitch-proj`
+
+This section describes the complete process used to package and publish `stitch-proj` to PyPI.
+
+---
+
+## 1. Project Structure
+
+The project uses a `src/` layout, which is the recommended modern packaging structure:
+
+```
+stitch-core/
+├── pyproject.toml
+├── README.md
+├── LICENSE
+├── src/
+│   └── stitch_proj/
+│       ├── __init__.py
+│       ├── ingest_babel.py
+│       ├── local_babel.py
+│       ├── row_counts.py
+│       └── stitchutils.py
+├── tests/
+└── dist/
+```
+
+Key points:
+
+- All importable code lives under `src/stitch_proj/`
+- Tests are outside the package (see `tests/`)
+- PyPI distribution artifacts are generated into `dist/`
+- Metadata and build configuration live in `pyproject.toml`
+
+---
+
+## 2. pyproject.toml Configuration
+
+Packaging is defined entirely in `pyproject.toml` (PEP 517/518/621 compliant).
+
+It specifies:
+
+- Build system (`setuptools`, `wheel`)
+- Project name
+- Version
+- Description
+- Authors
+- License
+- Python version requirement (>= 3.12)
+- Dependencies
+- Optional development dependencies
+- Package discovery via `src`
+
+Example critical sections:
+
+```toml
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stitch-proj"
+version = "0.1.0"
+authors = [
+  { name="First Last", email="example@example.com" },
+]
+
+maintainers = [
+  { name="First Last", email="example@example.com" },
+]
+
+description = "the description for the package. Should be just a few sentencees"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Development Status :: 3 - Alpha",
+]
+
+dependencies = [
+ list general dependencies, everyone will need to run the app here
+]
+
+[project.optional-dependencies]
+dev = [
+list dependencies only devs will need to run the app here
+]
+
+[project.urls]
+Homepage = "github repository where the code for this package lives"
+Issues = "where issues should be documented"
+
+[project.scripts]
+ingest-babel = "stitch_proj.ingest_babel:_main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["stitch_proj*"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
+ignore = []
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+```
+
+---
+
+## 3. Install Build Tools
+
+Before building:
+
+```bash
+python -m pip install --upgrade build twine
+```
+
+- `build` generates distributions
+- `twine` uploads to PyPI
+
+---
+
+## 4. Build the Package
+
+From the project root:
+
+```bash
+python -m build
+```
+
+This generates:
+
+```
+dist/
+├── stitch_proj-0.1.0-py3-none-any.whl
+└── stitch_proj-0.1.0.tar.gz
+```
+
+Artifacts:
+
+- `.whl` → wheel (binary distribution)
+- `.tar.gz` → source distribution (sdist)
+
+---
+
+## 5. Verify the Package
+
+Optional but recommended:
+
+```bash
+twine check dist/*
+```
+
+This validates metadata and README rendering.
+
+---
+
+## 6. Upload to PyPI
+
+To upload to PyPI:
+
+```bash
+twine upload dist/*
+```
+
+You must have:
+
+- A PyPI account
+- An API token configured (recommended)
+
+Example using token:
+
+```bash
+twine upload -u __token__ -p <your-token> dist/*
+```
+
+---
+
+## 7. Install From PyPI
+
+After upload:
+
+```bash
+pip install stitch-proj
+```
+
+Or for development:
+
+```bash
+pip install stitch-proj[dev]
+```
+
+---
+
+## 8. Versioning Workflow
+
+When releasing a new version:
+
+1. Update version in `pyproject.toml`
+2. Remove old build artifacts:
+   ```bash
+   rm -rf dist/ build/ src/*.egg-info
+   ```
+3. Rebuild:
+   ```bash
+   python -m build
+   ```
+4. Upload:
+   ```bash
+   twine upload dist/*
+   ```
+
+---
+
+# Python distribution package requirements 
+All external PyPI distribution package requirements for the `stitch-proj` project are listed in the
+[`requirements.txt`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/requirements.txt) file.  
+The `run-checks.sh` script (see section "Running
+the type checks, lint checks, ..." below) depends on the packages `pytest`,
+`ruff`, `vulture`, and `pylint`.  For a "querying" type user that is just using
+`local_babel.py`, only three PyPI distribution packages are needed, `requests`,
+`numpy`, and the Biolink Model Toolkit (`bmt`). Additionally, for an "ingester"
+type user who wants to run `ingest_babel.py` to build a local Babel sqlite
+database from scratch, the PyPI packages `pandas`, `ray`, and
+`htmllistparse` are needed. The `requirements.txt` file contains
+the full set of dependencies.
 
 # How to cite Babel in a publication
 Please see the [Babel `CITATION.cff` file](https://github.com/TranslatorSRI/Babel/blob/master/CITATION.cff).
