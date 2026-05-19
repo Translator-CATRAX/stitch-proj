@@ -1,0 +1,9 @@
+build>=1.5.0
+mypy>=1.15.0
+pandas-stubs>=2.2.3.241126
+pylint>=3.3.8
+pytest>=8.3.5
+ruff>=0.11.12
+twine>=6.2.0
+types-requests>=2.32.4.20250809
+vulture>=2.14
