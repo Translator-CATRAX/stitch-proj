@@ -227,7 +227,8 @@ import stitch.local_babel as lb
 ```
 
 The `stitch-proj` package has the following runtime PyPI distribution package
-dependencies (see [`requirements.txt`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/requirements.txt)),
+dependencies (see the `[project.dependencies]` table in
+[`pyproject.toml`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/pyproject.toml)),
 which are installed automatically by `pip install stitch-proj`:
 
 - bmt >= 1.4.5
@@ -235,8 +236,7 @@ which are installed automatically by `pip install stitch-proj`:
 - requests >= 2.32.5
 - pandas >= 2.2.3
 
-`pyproject.toml` reads these specs dynamically from `requirements.txt` (via
-`[tool.setuptools.dynamic]`), so the requirements file remains the single
+These specs are declared directly in `pyproject.toml`, which is the single
 source of truth for runtime dependencies.
 
 # How to use the local Babel sqlite database
@@ -350,7 +350,7 @@ cd stitch-proj
 Or if you are using AWS,
 - `ssh ubuntu@stitch2.rtx.ai` (if running in AWS); else just create a new `bash` session
 - `git clone https://github.com/Translator-CATRAX/stitch-proj.git`
-- `cd stitch-proj` (this is the directory that contains `requirements.txt`)
+- `cd stitch-proj` (this is the directory that contains `pyproject.toml`)
 - `./run-setup-venv.sh`
 The last step above (i.e., the `pip3 install -e .` step) sets up some symbolic
 links within your virtualenv, so that `stitchutils` can be imported
@@ -359,19 +359,19 @@ directory is. You will need this in order for the unit test module
 `tests/test_ingest_babel.py` to run successfully.
 
 # Python distribution package requirements 
-External PyPI distribution package requirements for the `stitch-proj` project are split across two files:
-[`requirements.txt`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/requirements.txt)
-contains the runtime dependencies needed to _use_ the software (for either querying or
-ingesting Babel), and
-[`requirements-dev.txt`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/requirements-dev.txt)
-contains the additional packages needed only when _developing_ `stitch-proj` (e.g., for running
+External PyPI distribution package requirements for the `stitch-proj` project are
+declared in [`pyproject.toml`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/pyproject.toml),
+in two places: the `[project.dependencies]` table lists the runtime dependencies
+needed to _use_ the software (for either querying or ingesting Babel), and the
+`dev` entry of the `[project.optional-dependencies]` table lists the additional
+packages needed only when _developing_ `stitch-proj` (e.g., for running
 `run-checks.sh`, or for building and uploading a release to PyPI).
 The `run-checks.sh` script (see section "Running
 the type checks, lint checks, ..." below) depends on the packages `pytest`,
-`ruff`, `vulture`, and `pylint`, all of which are listed in `requirements-dev.txt`.
-The `requirements.txt` file contains the full set of runtime dependencies
-(`bmt`, `htmllistparse`, `pandas`, and `requests`); developers should install
-both files (or just use `run-setup-venv.sh --dev`).
+`ruff`, `vulture`, and `pylint`, all of which are listed in the `dev` extra.
+The runtime dependencies are `bmt`, `htmllistparse`, `pandas`, and `requests`;
+developers should install the `dev` extra as well (just use
+`run-setup-venv.sh --dev`, which runs `pip install -e ".[dev]"`).
 
 # How to run the `stitch-proj` Babel sqlite ingest in AWS
 First, you need to edit `run-ingest-aws.sh` to update the value for the `BABEL_BASE_URL` 
@@ -587,8 +587,6 @@ stitch-proj/
 ├── pyproject.toml
 ├── README.md
 ├── LICENSE
-├── requirements.txt
-├── requirements-dev.txt
 ├── run-setup-venv.sh
 ├── stitch/
 │   ├── __init__.py
@@ -695,8 +693,8 @@ After upload:
 pip install stitch-proj
 ```
 
-For development work, clone the repository and install the dev dependencies
-from `requirements-dev.txt`:
+For development work, clone the repository and install the package with its
+`dev` extra:
 
 ```bash
 git clone https://github.com/Translator-CATRAX/stitch-proj.git

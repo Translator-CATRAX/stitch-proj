@@ -6,6 +6,7 @@ src = ["stitch"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+testpaths = ["tests"]
 
 [build-system]
 requires = ["setuptools>=61"]
@@ -15,13 +16,25 @@ build-backend = "setuptools.build_meta"
 name = "stitch-proj"
 version = "0.1.2"
 requires-python = ">=3.12"
-dynamic = ["dependencies", "optional-dependencies"]
+dependencies = [
+    "bmt>=1.4.5",
+    "htmllistparse>=0.6.1",
+    "pandas>=2.2.3",
+    "requests>=2.32.5",
+]
 
-[tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt"]}
-
-[tool.setuptools.dynamic.optional-dependencies]
-dev = {file = ["requirements-dev.txt"]}
+[project.optional-dependencies]
+dev = [
+    "build>=1.5.0",
+    "mypy>=1.15.0",
+    "pandas-stubs>=2.2.3.241126",
+    "pylint>=3.3.8",
+    "pytest>=8.3.5",
+    "ruff>=0.11.12",
+    "twine>=6.2.0",
+    "types-requests>=2.32.4.20250809",
+    "vulture>=2.14",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

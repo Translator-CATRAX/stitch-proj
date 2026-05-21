@@ -11,8 +11,8 @@ done
 
 rm -r -f venv
 python3.12 -m venv venv
-venv/bin/pip3 install -r requirements.txt
 if [ "${install_dev}" = true ]; then
-    venv/bin/pip3 install -r requirements-dev.txt
+    venv/bin/pip3 install -e ".[dev]"
+else
+    venv/bin/pip3 install -e .
 fi
-venv/bin/pip3 install -e .
