@@ -63,6 +63,7 @@ Run on a long-lived host inside screen/tmux and stream logs to a file:
 You can monitor system memory/IO with tools like `top` in another shell.
 There is also a script "instance-memory-tracker.sh", that will record memory usage.
 """
+# pylint: disable=too-many-lines  # large single-file ingest script
 import argparse
 import ast
 import contextlib
@@ -228,15 +229,20 @@ def _create_index(
     index_name = extra_args.get('index_name', f'idx_{table}_{col}')
     index_type_blank_or_unique = extra_args.get('index_type_blank_or_unique', '')
     index_where_clause = extra_args.get('index_where_clause', '')
+    index_collation = extra_args.get('index_collation', '')
     # Assemble the pieces conditionally so the emitted DDL has no stray
     # double space (when the index type is blank) and no space before
     # the semicolon (when there is no WHERE clause).
     index_type_prefix = f'{index_type_blank_or_unique} ' \
         if index_type_blank_or_unique else ''
     where_suffix = f' {index_where_clause}' if index_where_clause else ''
+    # A non-default collation (e.g. NOCASE) is applied to the indexed
+    # column so that SQLite's LIKE optimization can use the index for
+    # case-insensitive prefix queries (see `_INDEX_COLLATIONS`).
+    col_expr = f'{col} COLLATE {index_collation}' if index_collation else col
     statement = (f'CREATE {index_type_prefix}INDEX IF NOT EXISTS '
                  f'{index_name} '
-                 f'ON {table} ({col}){where_suffix};')
+                 f'ON {table} ({col_expr}){where_suffix};')
     _log_print(f"creating {index_type_prefix}index {index_name} " \
                f"on column \"{col}\" in table \"{table}\"")
     conn.execute(statement)
@@ -644,6 +650,16 @@ def _make_url_ingester(conn: sqlite3.Connection,
         return chunk_ctr + glbl_chnk_cnt
     return ingest_from_url
 
+# Work-plan indexes whose indexed column needs a non-default collation,
+# keyed by (table, column). `idx_identifiers_label` uses NOCASE so that
+# the case-insensitive prefix `LIKE` query in
+# `local_babel.map_name_to_curie` can use the index: SQLite's LIKE
+# optimization only applies when the index collation matches the
+# case-sensitivity of LIKE (case-insensitive by default).
+_INDEX_COLLATIONS: dict[tuple[str, str], str] = {
+    ('identifiers', 'label'): 'NOCASE',
+}
+
 def _create_indices(conn: sqlite3.Connection,
                     phase: int,
                     print_ddl_file_obj: IO[str] | None = None):
@@ -658,7 +674,8 @@ def _create_indices(conn: sqlite3.Connection,
     """
     for table, col, idx_phase in SQL__CREATE_INDEX_WORK_PLAN:
         if idx_phase == phase:
-            _create_index(table, col, conn, print_ddl_file_obj)
+            _create_index(table, col, conn, print_ddl_file_obj,
+                          index_collation=_INDEX_COLLATIONS.get((table, col), ''))
     if phase == 1:
         _create_index('conflation_members', 'cluster_id', conn,
                       print_ddl_file_obj=print_ddl_file_obj,
