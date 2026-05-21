@@ -44,7 +44,8 @@
         identifier_id INTEGER NOT NULL,
         taxa_identifier_id INTEGER NOT NULL,
         FOREIGN KEY(identifier_id) REFERENCES identifiers(id),
-        FOREIGN KEY(taxa_identifier_id) REFERENCES identifiers(id));
+        FOREIGN KEY(taxa_identifier_id) REFERENCES identifiers(id),
+        UNIQUE(identifier_id, taxa_identifier_id));
     
 
         CREATE TABLE conflation_clusters (
@@ -61,14 +62,14 @@
         FOREIGN KEY(identifier_id) REFERENCES identifiers(id),
         UNIQUE(cluster_id, identifier_id));
     
-CREATE INDEX idx_cliques_type_id ON cliques (type_id);
-CREATE INDEX idx_cliques_primary_identifier_id ON cliques (primary_identifier_id);
-CREATE INDEX idx_identifiers_descriptions_description_id ON identifiers_descriptions (description_id);
-CREATE INDEX idx_identifiers_descriptions_identifier_id ON identifiers_descriptions (identifier_id);
-CREATE INDEX idx_identifiers_cliques_identifier_id ON identifiers_cliques (identifier_id);
-CREATE INDEX idx_identifiers_cliques_clique_id ON identifiers_cliques (clique_id);
-CREATE INDEX idx_identifiers_taxa_identifier_id ON identifiers_taxa (identifier_id);
-CREATE INDEX idx_identifiers_taxa_taxa_identifier_id ON identifiers_taxa (taxa_identifier_id);
-CREATE INDEX idx_conflation_members_identifier_id ON conflation_members (identifier_id);
-CREATE INDEX idx_conflation_clusters_type ON conflation_clusters (type);
-CREATE UNIQUE INDEX one_canonical_per_cluster ON conflation_members (cluster_id) WHERE is_canonical = 1;
+CREATE UNIQUE INDEX IF NOT EXISTS one_canonical_per_cluster ON conflation_members (cluster_id) WHERE is_canonical = 1;
+CREATE INDEX IF NOT EXISTS idx_identifiers_label ON identifiers (label);
+CREATE INDEX IF NOT EXISTS idx_cliques_type_id ON cliques (type_id);
+CREATE INDEX IF NOT EXISTS idx_cliques_primary_identifier_id ON cliques (primary_identifier_id);
+CREATE INDEX IF NOT EXISTS idx_identifiers_descriptions_description_id ON identifiers_descriptions (description_id);
+CREATE INDEX IF NOT EXISTS idx_identifiers_descriptions_identifier_id ON identifiers_descriptions (identifier_id);
+CREATE INDEX IF NOT EXISTS idx_identifiers_cliques_identifier_id ON identifiers_cliques (identifier_id);
+CREATE INDEX IF NOT EXISTS idx_identifiers_cliques_clique_id ON identifiers_cliques (clique_id);
+CREATE INDEX IF NOT EXISTS idx_identifiers_taxa_taxa_identifier_id ON identifiers_taxa (taxa_identifier_id);
+CREATE INDEX IF NOT EXISTS idx_conflation_members_identifier_id ON conflation_members (identifier_id);
+CREATE INDEX IF NOT EXISTS idx_conflation_clusters_type ON conflation_clusters (type);
