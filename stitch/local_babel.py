@@ -699,7 +699,7 @@ def map_name_to_curie(conn: sqlite3.Connection, name: str) -> Optional[tuple[str
     Uses prefix matching with a small set of variants.
     """
 
-    QUERY = (
+    query = (
         "SELECT curie, label FROM identifiers "
         "WHERE label LIKE ? ESCAPE '\\' "
         "AND curie NOT LIKE 'PMID:%' "
@@ -772,7 +772,7 @@ def map_name_to_curie(conn: sqlite3.Connection, name: str) -> Optional[tuple[str
 
     for variant in query_variants(name):
         safe = variant.replace('\\', r'\\').replace('%', r'\%').replace('_', r'\_')
-        row = cur.execute(QUERY, (safe + '%',)).fetchone()
+        row = cur.execute(query, (safe + '%',)).fetchone()
         if row:
             return row  # (curie, matched_label)
 
