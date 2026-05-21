@@ -587,6 +587,9 @@ stitch-proj/
 ├── pyproject.toml
 ├── README.md
 ├── LICENSE
+├── build-release.sh
+├── document-dependencies.sh
+├── run-checks.sh
 ├── run-setup-venv.sh
 ├── stitch/
 │   ├── __init__.py
@@ -599,6 +602,9 @@ stitch-proj/
 ├── tools/
 └── old-tools/
 ```
+
+Not every file is shown above -- only the directories, and the scripts
+that are key steps in the build/release process.
 
 Key points:
 
@@ -637,24 +643,34 @@ The `build` and `twine` packages each perform a key function in the build proces
 
 ## 4. Build the package
 
-From the project root:
+Release builds go through the `build-release.sh` wrapper -- **not** a
+bare `python -m build`:
 
 ```bash
-python -m build
+./build-release.sh
 ```
 
-This generates:
+`build-release.sh` refuses to build unless HEAD is exactly at a
+`vX.Y.Z` release tag, that tag matches the `version` in
+`pyproject.toml`, and the working tree is clean -- so a distribution
+can never be produced (and then uploaded) without a corresponding,
+matching source-repository tag. It then runs `python -m build` under
+the hood, generating:
 
 ```
 dist/
-├── stitch_proj-0.1.0-py3-none-any.whl
-└── stitch_proj-0.1.0.tar.gz
+├── stitch_proj-X.Y.Z-py3-none-any.whl
+└── stitch_proj-X.Y.Z.tar.gz
 ```
 
 Artifacts:
 
 - `.whl` → wheel (binary distribution)
 - `.tar.gz` → source distribution (sdist)
+
+Because a matching tag must already exist, building is not a standalone
+step; follow the full ordered procedure in
+[§8 Versioning workflow](#8-versioning-workflow).
 
 ## 5. Verify the package
 
@@ -704,22 +720,41 @@ cd stitch-proj
 
 ## 8. Versioning workflow
 
-When releasing a new version:
+A release is anchored to a git tag, and the distribution is built from
+a fresh checkout of that tag, so the uploaded artifacts always
+correspond to a tagged commit. Perform these steps in order:
 
-1. Update version in `pyproject.toml`
-2. Remove old build artifacts using the project's clean script (see
-   "[Cleaning build artifacts](#cleaning-build-artifacts)" below):
+1. **Bump the version:** set `version` in `pyproject.toml` to the new
+   `X.Y.Z` (it must be greater than the highest version already on
+   PyPI).
+2. **Run the checks:** `./run-checks.sh` -- lint and unit tests must
+   pass.
+3. **Commit** the version bump and any final changes.
+4. **Record the environment:** `./document-dependencies.sh` -- this
+   requires a clean working tree, so step 3 must come first; it writes
+   `dependencies.txt`.
+5. **Commit** `dependencies.txt`.
+6. **Tag the release:** `git tag vX.Y.Z` -- the tag must match the
+   `pyproject.toml` version from step 1.
+7. **Push** the commits and the tag:
    ```bash
+   git push && git push --tags
+   ```
+8. **Build from a fresh checkout of the tag,** in a directory separate
+   from your working clone:
+   ```bash
+   git clone https://github.com/Translator-CATRAX/stitch-proj.git stitch-proj-release
+   cd stitch-proj-release
+   git checkout vX.Y.Z
+   ./run-setup-venv.sh --dev      # provides the build and twine tools
+   source venv/bin/activate
    ./tools/clean.sh
+   ./build-release.sh
    ```
-3. Rebuild:
-   ```bash
-   python -m build
-   ```
-4. Upload:
-   ```bash
-   twine upload dist/*
-   ```
+   `build-release.sh` re-verifies the tag, the version match, and a
+   clean tree before building (see [§4](#4-build-the-package)).
+9. **Verify the artifacts:** `twine check dist/*`.
+10. **Upload to PyPI:** `twine upload dist/*`.
 
 # Cleaning build artifacts
 

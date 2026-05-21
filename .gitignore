@@ -15,6 +15,7 @@ db
 build-*/
 stitch_proj.egg-info/
 build/
+dist/
 .claude/
 .mypy_cache/
 .pytest_cache/
