@@ -37,6 +37,7 @@ import itertools
 import multiprocessing
 import multiprocessing.pool
 import random
+import re
 import sqlite3
 from typing import Callable, Iterable, Optional, TypeAlias, TypedDict, TypeVar
 
@@ -690,3 +691,89 @@ ORDER BY types.curie COLLATE NOCASE;
     """
     rows = conn.cursor().execute(query, (curie,)).fetchall()
     return tuple(row[0] for row in rows)
+
+
+def map_name_to_curie(conn: sqlite3.Connection, name: str) -> Optional[tuple[str, str]]:
+    """Return (curie, matched_label) for a given name, or None if no match.
+
+    Uses prefix matching with a small set of variants.
+    """
+
+    QUERY = (
+        "SELECT curie, label FROM identifiers "
+        "WHERE label LIKE ? ESCAPE '\\' "
+        "AND curie NOT LIKE 'PMID:%' "
+        "LIMIT 1;"
+    )
+
+    def _strip_one_trailing_paren(s: str) -> Optional[str]:
+        s = s.rstrip()
+        if not s.endswith(')'):
+            return None
+        depth = 0
+        for i in range(len(s) - 1, -1, -1):
+            if s[i] == ')':
+                depth += 1
+            elif s[i] == '(':
+                depth -= 1
+                if depth == 0:
+                    stripped = s[:i].rstrip()
+                    return stripped if stripped else None
+        return None
+
+    def _singularize(s: str) -> Optional[str]:
+        if len(s) < 5:
+            return None
+        head, _, tail = s.rpartition(' ')
+        target = tail or s
+        if len(target) < 4:
+            return None
+        if target.endswith('ies') and len(target) > 4:
+            new_tail = target[:-3] + 'y'
+        elif target.endswith('s') and not target.endswith('ss'):
+            new_tail = target[:-1]
+        else:
+            return None
+        return f'{head} {new_tail}' if head else new_tail
+
+    def query_variants(name: str) -> list[str]:
+        seen = set()
+        out = []
+
+        def add(x):
+            if not x:
+                return
+            x = re.sub(r'\s+', ' ', x).strip()
+            if x and x not in seen:
+                seen.add(x)
+                out.append(x)
+
+        add(name)
+
+        # strip trailing (...)
+        current = name
+        while True:
+            stripped = _strip_one_trailing_paren(current)
+            if not stripped:
+                break
+            add(stripped)
+            current = stripped
+
+        # remove inline (ABBR)
+        add(re.sub(r'\s*\([A-Za-z]{2}[A-Za-z0-9]{0,8}\)', '', name))
+
+        # singular
+        for v in list(out):
+            add(_singularize(v))
+
+        return out
+
+    cur = conn.cursor()
+
+    for variant in query_variants(name):
+        safe = variant.replace('\\', r'\\').replace('%', r'\%').replace('_', r'\_')
+        row = cur.execute(QUERY, (safe + '%',)).fetchone()
+        if row:
+            return row  # (curie, matched_label)
+
+    return None

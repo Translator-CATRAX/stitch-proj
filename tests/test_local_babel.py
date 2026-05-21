@@ -14,6 +14,7 @@ from stitch.local_babel import (
     map_curie_to_preferred_curies,
     map_curies_to_conflation_curies,
     map_curies_to_preferred_curies,
+    map_name_to_curie,
     map_pref_curie_to_synonyms,
     map_preferred_curie_to_cliques,
 )
@@ -255,3 +256,92 @@ def test_map_any_curie_to_cliques_ordering_based_on_test_db():
     )
     results_again = map_any_curie_to_cliques(conn, "MESH:D014867")
     assert results == results_again, "Results should be identical across repeated calls"
+
+
+def _make_name_lookup_test_db() -> sqlite3.Connection:
+    """In-memory `identifiers` table for exercising `map_name_to_curie`."""
+    conn = sqlite3.connect(":memory:")
+    conn.executescript("""
+        CREATE TABLE identifiers (id INTEGER PRIMARY KEY, curie TEXT, label TEXT);
+        INSERT INTO identifiers (curie, label) VALUES
+            ('CHEBI:15365',  'Aspirin'),
+            ('MESH:D014409', 'Interleukin 6 receptor'),
+            ('CHEBI:9754',   'Therapy'),
+            ('X:1',          'abcdef'),
+            ('PMID:12345',   'Pmidexclusive label');
+    """)
+    return conn
+
+
+def test_map_name_to_curie_basic():
+    conn = _make_name_lookup_test_db()
+
+    # Prefix match: the query is a prefix of a stored label, and the full
+    # stored label is returned as the second element of the tuple.
+    assert map_name_to_curie(conn, "Aspi") == ("CHEBI:15365", "Aspirin")
+    assert map_name_to_curie(conn, "Aspirin") == ("CHEBI:15365", "Aspirin")
+
+    # LIKE is case-insensitive for ASCII.
+    assert map_name_to_curie(conn, "aspirin") == ("CHEBI:15365", "Aspirin")
+
+    # Surrounding and repeated whitespace is normalized away.
+    assert map_name_to_curie(conn, "   Aspirin   ") == ("CHEBI:15365", "Aspirin")
+
+    # No label has this as a prefix -> None.
+    assert map_name_to_curie(conn, "Zzz nonexistent substance") is None
+
+
+def test_map_name_to_curie_excludes_pmid():
+    conn = _make_name_lookup_test_db()
+    # 'Pmidexclusive label' exists, but only on a PMID: curie, which the
+    # query explicitly filters out -> no usable match.
+    assert map_name_to_curie(conn, "Pmidexclusive") is None
+
+
+def test_map_name_to_curie_variant_generation():
+    conn = _make_name_lookup_test_db()
+
+    # Trailing parenthetical is stripped: "Aspirin (...)" -> "Aspirin".
+    assert map_name_to_curie(conn, "Aspirin (pain reliever)") == \
+        ("CHEBI:15365", "Aspirin")
+
+    # Inline "(ABBR)" is removed: "... (IL6) ..." -> "Interleukin 6 receptor".
+    assert map_name_to_curie(conn, "Interleukin 6 (IL6) receptor") == \
+        ("MESH:D014409", "Interleukin 6 receptor")
+
+    # Naive singularization: trailing "s" -> "" and "ies" -> "y".
+    assert map_name_to_curie(conn, "Aspirins") == ("CHEBI:15365", "Aspirin")
+    assert map_name_to_curie(conn, "Therapies") == ("CHEBI:9754", "Therapy")
+
+
+def test_map_name_to_curie_escapes_like_wildcards():
+    conn = _make_name_lookup_test_db()
+    # 'abcdef' is in the DB. If '%' / '_' were not escaped they would act
+    # as LIKE wildcards and match 'abcdef'; escaped, they are literal, so
+    # these queries must NOT match.
+    assert map_name_to_curie(conn, "ab%f") is None
+    assert map_name_to_curie(conn, "a_c") is None
+    # Sanity check: a plain literal prefix of 'abcdef' does match.
+    assert map_name_to_curie(conn, "abc") == ("X:1", "abcdef")
+
+
+def test_map_name_to_curie_real_db(readonly_conn: sqlite3.Connection):
+    # Obviously-absent name -> None.
+    assert map_name_to_curie(readonly_conn,
+                             "Zzz nonexistent substance 9999") is None
+
+    # A real label should resolve to some (curie, label) pair. We do not
+    # assert the exact curie, since labels/contents can change between
+    # Babel releases and a prefix match may land on a sibling label.
+    label_row = readonly_conn.cursor().execute(
+        "SELECT label FROM identifiers WHERE curie = ?",
+        ("CHEBI:15377",),
+    ).fetchone()
+    assert label_row is not None and label_row[0]
+
+    result = map_name_to_curie(readonly_conn, label_row[0])
+    assert result is not None
+    curie, matched_label = result
+    assert isinstance(curie, str) and curie != ""
+    assert isinstance(matched_label, str) and matched_label != ""
+    assert not curie.startswith("PMID:")
