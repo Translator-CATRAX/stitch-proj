@@ -532,11 +532,18 @@ sqlite3_analyzer babel.sqlite > babel-sqlite-analysis.txt
 The analysis should take less than an hour.
 
 # How to regenerate the schema diagram
-Use the `ingest_babel.py` script to generate the `ddl.sql` file as follows: 
+The schema diagram is rendered (in DbVisualizer) from a DDL script,
+`ddl.sql`. First regenerate that DDL script using the `ingest-babel`
+command:
 ```
 cd stitch-proj
-venv/bin/python3 stitch/ingest_babel.py --print-ddl --dry-run 2>ddl.sql 
+venv/bin/ingest-babel --print-ddl --quiet 2>ddl.sql
 ``` 
+The `--print-ddl` flag emits the DDL to stderr and then exits without
+ingesting any data; `--quiet` suppresses progress logging so that
+`ddl.sql` captures only DDL statements.
+
+Then render the schema diagram from `ddl.sql` as follows.
 On macOS, run the DbVisualizer application (free version
 24.3.3). If you don't see "SQLite" in the treeview control on the left, then
 under the "Database" menu, select "Create Database Connection" and double-click
