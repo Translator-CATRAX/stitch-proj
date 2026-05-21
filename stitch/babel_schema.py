@@ -88,7 +88,7 @@ SQL_CREATE_TABLE_CONFLATION_MEMBERS = \
         is_canonical INTEGER NOT NULL CHECK (is_canonical in (0, 1)),
         FOREIGN KEY(cluster_id) REFERENCES conflation_clusters(id),
         FOREIGN KEY(identifier_id) REFERENCES identifiers(id),
-        UNIQUE(cluster_id, identifier_id))
+        UNIQUE(cluster_id, identifier_id));
     '''
 
 # Index creation work plan. Each entry is (table, column, phase):
@@ -112,9 +112,9 @@ SQL_CREATE_TABLE_CONFLATION_MEMBERS = \
 # because it enforces an INSERT-time constraint and must exist during
 # the conflation ingest.
 SQL__CREATE_INDEX_WORK_PLAN = \
-    (('cliques',                  'type_id',               2),
+    (('identifiers',              'label',                 2),
+     ('cliques',                  'type_id',               2),
      ('cliques',                  'primary_identifier_id', 2),
-     ('descriptions',             'desc',                  2),
      ('identifiers_descriptions', 'description_id',        2),
      ('identifiers_descriptions', 'identifier_id',         2),
      ('identifiers_cliques',      'identifier_id',         2),
