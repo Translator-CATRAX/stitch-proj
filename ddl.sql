@@ -63,7 +63,7 @@
         UNIQUE(cluster_id, identifier_id));
     
 CREATE UNIQUE INDEX IF NOT EXISTS one_canonical_per_cluster ON conflation_members (cluster_id) WHERE is_canonical = 1;
-CREATE INDEX IF NOT EXISTS idx_identifiers_label ON identifiers (label);
+CREATE INDEX IF NOT EXISTS idx_identifiers_label ON identifiers (label COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS idx_cliques_type_id ON cliques (type_id);
 CREATE INDEX IF NOT EXISTS idx_cliques_primary_identifier_id ON cliques (primary_identifier_id);
 CREATE INDEX IF NOT EXISTS idx_identifiers_descriptions_description_id ON identifiers_descriptions (description_id);
