@@ -72,8 +72,8 @@ application (~250 GiB free disk required; see [Requirements](#requirements)):
 pip install stitch-proj
 
 # 2. Download the pre-built Babel sqlite file (~217 GiB) to a location of your choice.
-curl -s -L https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250901-p2.sqlite \
-    > babel-20250901-p2.sqlite
+curl -s -L https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250901-p3.sqlite \
+    > babel-20250901-p3.sqlite
 ```
 
 Then from Python:
@@ -81,7 +81,7 @@ Then from Python:
 ```python
 import stitch.local_babel as lb
 
-conn = lb.connect_to_db_read_only("babel-20250901-p2.sqlite")
+conn = lb.connect_to_db_read_only("babel-20250901-p3.sqlite")
 res = lb.map_curie_to_preferred_curies(conn, "MESH:D014867")
 # → (("CHEBI:15377", "biolink:SmallMolecule", "MESH:D014867"),)
 ```
@@ -172,18 +172,20 @@ the Graviton3 processor. Testing has been done on the following MacOS system:
 - `openblas` installed via Homebrew
 
 # Downloading a pre-built Babel sqlite database file
-[`babel-20250901-p2.sqlite`](https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250901-p2.sqlite)
+[`babel-20250901-p3.sqlite`](https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250901-p3.sqlite)
 (217 GiB) is available for download from AWS S3. For details and an MD5
 checksum hash, see the [Releases page](https://github.com/Translator-CATRAX/stitch-proj/releases)
 for the stitch project. You will need to download this file (or, alternatively,
 build it from scratch using `ingest_babel.py`) in order to query Babel
-locally or to run the unit test suite. The "-p2" on the downloadable
-sqlite database indicates that the database has been patched twice: once
-to add the `is_canonical` column to the `conflation_members` table
+locally or to run the unit test suite. The "-p3" on the downloadable
+sqlite database indicates that the database has been patched three times:
+in this case, the first patch was to add the `is_canonical` column to the `conflation_members` table
 (see [stitch-proj issue 80](https://github.com/Translator-CATRAX/stitch-proj/issues/80)),
-and a second time to create an index on the column `desc` in the
-`descriptions` table
+the second patch was to create an index on the column `label` in the
+`identifiers` table
 (see [stitch-proj issue 87](https://github.com/Translator-CATRAX/stitch-proj/issues/87)).
+and a third patch was to make that index case-insensitive
+(see [stitch-proj issue 92](https://github.com/Translator-CATRAX/stitch-proj/issues/92)).
 
 ## Where to place the file
 A querier can put the file anywhere and pass the path to
@@ -195,8 +197,8 @@ way to satisfy that is:
 ```
 cd stitch-proj
 mkdir -p db
-curl -s -L https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250901-p2.sqlite > \
-    db/babel-20250901-p2.sqlite
+curl -s -L https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250901-p3.sqlite > \
+    db/babel-20250901-p3.sqlite
 ```
 
 A symbolic link `db -> /some/other/path` also works, if you want to keep
@@ -248,7 +250,7 @@ so each worker process can open its own connection):
 ```python
 import stitch.local_babel as lb
 
-conn = lb.connect_to_db_read_only("db/babel-20250901-p2.sqlite")
+conn = lb.connect_to_db_read_only("db/babel-20250901-p3.sqlite")
 
 # Resolve a CURIE to its preferred CURIE(s) and type(s):
 res = lb.map_curie_to_preferred_curies(conn, "MESH:D014867")
@@ -568,6 +570,8 @@ To get the file size in GiB (Linux/GNU `stat`):
 ```
 stat -c %s babel.sqlite | awk '{printf "%.2f GiB\n", $1/1024/1024/1024}'
 ```
+(if you are on macOS, instead of using `stat`, 
+substitute `gstat` from the Homebrew `coreutils` package).
 
 # Packaging Process for `stitch-proj`
 
