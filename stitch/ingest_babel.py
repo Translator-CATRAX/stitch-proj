@@ -1,7 +1,6 @@
 """
-ingest_babel.py — Ingest Babel “compendia” and “conflation” files into a
-normalized SQLite database, with chunked I/O, progress logging, and
-performance-tuned PRAGMAs.
+ingest_babel.py — Ingest Babel distribution files into a
+normalized SQLite database, with chunked I/O and progress logging.
 
 Author: Stephen A. Ramsey (Oregon State University)
 Date: February 2025
@@ -10,15 +9,15 @@ Python: 3.12
 Overview
 --------
 This script downloads (or reads locally) Babel release compendia and conflation
-files and builds a SQLite database with thes tables (see code for the full DDL):
+files and builds a SQLite database with these tables (see code for the full DDL):
 - types, identifiers, cliques, descriptions
 - identifiers_descriptions, identifiers_cliques, identifiers_taxa
 - conflation_clusters, conflation_members
 This script should take approximately 28 hours to run, on an i4i.2xlarge instance.
-
 Compendia files are json-lines (read in chunks); conflation files
 are one Python list literal per line. The UMLS compendia (`umls.txt`) has a
 different key order and is handled specially.
+Thank you to Gaurav Vaidya for helpful information about Babel.
 
 Key Features
 ------------
@@ -44,7 +43,8 @@ Command-Line Arguments
 --test-compendia-file      Local JSONL file for test type 1
 --quiet                    Suppress timestamped progress logs
 --dry-run                  Print the work plan without executing
---print-ddl                Emit CREATE TABLE statements to stderr, then exit
+--print-ddl                Emit all DDL (CREATE TABLE and CREATE INDEX
+                           statements) to stderr, then exit without ingesting
 --temp-dir                 Alternate temp dir (propagated to subprocess via re-exec)
 --no-exec                  Internal flag used by the re-exec path (do not set directly)
 
@@ -59,15 +59,9 @@ Test Modes
 How To Run (example)
 --------------------
 Run on a long-lived host inside screen/tmux and stream logs to a file:
-    python3.12 -u ingest_babel.py > ingest_babel.log 2>&1
-    tail -f ingest_babel.log
-
+  ./run-ingest-aws.sh
 You can monitor system memory/IO with tools like `top` in another shell.
-There is also a script "instance-memory-tracker.sh", in the stitch
-project area, that will record the script's memory usage (see the
-main README.md in the stitch project area).
-
-Thank you to Gaurav Vaidya for helpful information about Babel.
+There is also a script "instance-memory-tracker.sh", that will record memory usage.
 """
 import argparse
 import ast
@@ -234,10 +228,16 @@ def _create_index(
     index_name = extra_args.get('index_name', f'idx_{table}_{col}')
     index_type_blank_or_unique = extra_args.get('index_type_blank_or_unique', '')
     index_where_clause = extra_args.get('index_where_clause', '')
-    statement = (f'CREATE {index_type_blank_or_unique} INDEX IF NOT EXISTS '
+    # Assemble the pieces conditionally so the emitted DDL has no stray
+    # double space (when the index type is blank) and no space before
+    # the semicolon (when there is no WHERE clause).
+    index_type_prefix = f'{index_type_blank_or_unique} ' \
+        if index_type_blank_or_unique else ''
+    where_suffix = f' {index_where_clause}' if index_where_clause else ''
+    statement = (f'CREATE {index_type_prefix}INDEX IF NOT EXISTS '
                  f'{index_name} '
-                 f'ON {table} ({col}) {index_where_clause};')
-    _log_print(f"creating {index_type_blank_or_unique} index {index_name} " \
+                 f'ON {table} ({col}){where_suffix};')
+    _log_print(f"creating {index_type_prefix}index {index_name} " \
                f"on column \"{col}\" in table \"{table}\"")
     conn.execute(statement)
     if print_ddl_file_obj is not None:
@@ -867,6 +867,20 @@ def _main_args(babel_compendia_url: str,
     if test_type is not None and test_type == 1 and test_compendia_file is None:
         raise ValueError("for test type 1, you must specify --test_compendia_file")
     print_ddl_file_obj = sys.stderr if print_ddl else None
+    if print_ddl:
+        # Emit the full DDL (CREATE TABLE statements plus both index
+        # phases) to stderr, then exit without ingesting anything. An
+        # in-memory database is used so that no real database file is
+        # created or clobbered under any circumstances: the DDL is
+        # produced as a side effect of executing the statements against
+        # this throwaway connection.
+        with _get_database(':memory:', from_scratch=True,
+                           print_ddl_file_obj=print_ddl_file_obj) as conn:
+            _create_indices(conn, phase=1,
+                            print_ddl_file_obj=print_ddl_file_obj)
+            _create_indices(conn, phase=2,
+                            print_ddl_file_obj=print_ddl_file_obj)
+        return
     compendia_sorted_files, compendia_map_names = \
         _get_compendia_files(babel_compendia_url)
     conflation_sorted_files, conflation_map_names = \
@@ -969,3 +983,18 @@ def _main():
     sys.stdout.reconfigure(line_buffering=True)
     sys.stderr.reconfigure(line_buffering=True)
     _main_args(**su.namespace_to_dict(_get_args()))
+
+
+if __name__ == "__main__":
+    if not __package__:
+        print(
+            "Do not run stitch/ingest_babel.py directly.\n"
+            "Use either the officially recommended approach:\n"
+            "  venv/bin/ingest-babel\n"
+            "or, if the recommended approach is not suitable,\n"
+            "the module invocation form:\n"
+            "  python -m stitch.ingest_babel",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    _main()
