@@ -842,7 +842,7 @@ def _make_get_make_chunkproc_args_compendia(insrt_msng_taxa: bool) -> MakeChunkP
     return functools.partial(_get_make_chunkproc_args_compendia,
                              insrt_msng_taxa)
 
-# pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements
+# pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-statements,too-many-branches
 def _main_args(babel_compendia_url: str,
                babel_conflation_url: str,
                database_file_name: str,
