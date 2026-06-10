@@ -7,6 +7,7 @@ from stitch.local_babel import (
     connect_to_db_read_only,
     get_all_names_for_curie,
     get_categories_for_curie,
+    get_label_for_curie,
     get_n_random_curies,
     get_taxon_for_gene_or_protein,
     map_any_curie_to_cliques,
@@ -165,12 +166,8 @@ def test_get_all_names_for_curie(readonly_conn: sqlite3.Connection):
     # The identifier table label is included (the query always unions ti.label)
     # We don't hardcode the actual label string (db can change), just assert it’s
     # present.
-    label_row = readonly_conn.cursor().execute(
-        "SELECT label FROM identifiers WHERE curie = ?",
-        (curie,),
-    ).fetchone()
-    assert label_row is not None
-    label = label_row[0]
+    label = get_label_for_curie(readonly_conn, curie)
+    assert label is not None
     assert isinstance(label, str)
     assert label.strip() != ""
     assert label in names
@@ -325,6 +322,37 @@ def test_map_name_to_curie_escapes_like_wildcards():
     assert map_name_to_curie(conn, "abc") == ("X:1", "abcdef")
 
 
+def test_get_label_for_curie_in_memory():
+    conn = _make_name_lookup_test_db()
+
+    # Known CURIE -> its exact identifiers.label.
+    assert get_label_for_curie(conn, "CHEBI:15365") == "Aspirin"
+    assert get_label_for_curie(conn, "MESH:D014409") == "Interleukin 6 receptor"
+
+    # Unknown CURIE -> None.
+    assert get_label_for_curie(conn, "XYZZY:does_not_exist") is None
+
+
+def test_get_label_for_curie_real_db(readonly_conn: sqlite3.Connection):
+    curie = "CHEBI:15377"
+
+    # The helper should return exactly what the raw identifiers query returns.
+    label_row = readonly_conn.cursor().execute(
+        "SELECT label FROM identifiers WHERE curie = ?",
+        (curie,),
+    ).fetchone()
+    assert label_row is not None
+    expected_label = label_row[0]
+
+    label = get_label_for_curie(readonly_conn, curie)
+    assert label == expected_label
+    assert isinstance(label, str)
+    assert label.strip() != ""
+
+    # Unknown CURIE -> None.
+    assert get_label_for_curie(readonly_conn, "XYZZY:does_not_exist") is None
+
+
 def test_map_name_to_curie_real_db(readonly_conn: sqlite3.Connection):
     # Obviously-absent name -> None.
     assert map_name_to_curie(readonly_conn,
@@ -333,13 +361,10 @@ def test_map_name_to_curie_real_db(readonly_conn: sqlite3.Connection):
     # A real label should resolve to some (curie, label) pair. We do not
     # assert the exact curie, since labels/contents can change between
     # Babel releases and a prefix match may land on a sibling label.
-    label_row = readonly_conn.cursor().execute(
-        "SELECT label FROM identifiers WHERE curie = ?",
-        ("CHEBI:15377",),
-    ).fetchone()
-    assert label_row is not None and label_row[0]
+    label = get_label_for_curie(readonly_conn, "CHEBI:15377")
+    assert label
 
-    result = map_name_to_curie(readonly_conn, label_row[0])
+    result = map_name_to_curie(readonly_conn, label)
     assert result is not None
     curie, matched_label = result
     assert isinstance(curie, str) and curie != ""

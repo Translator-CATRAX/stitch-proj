@@ -615,6 +615,29 @@ def get_taxon_for_gene_or_protein(conn: sqlite3.Connection,
     """, (curie, )).fetchone()
     return row[0] if row else None
 
+def get_label_for_curie(conn: sqlite3.Connection,
+                        curie: str) -> Optional[str]:
+    """Return the `identifiers.label` for a CURIE, or `None` if not found.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Open database connection.
+    curie : str
+        The identifier CURIE to look up.
+
+    Returns
+    -------
+    Optional[str]
+        The `label` column from the `identifiers` row for `curie`, or `None`
+        if the CURIE is absent.
+    """
+    row = conn.cursor().execute(
+        "SELECT label FROM identifiers WHERE curie = ?",
+        (curie,),
+    ).fetchone()
+    return row[0] if row else None
+
 def get_all_names_for_curie(conn: sqlite3.Connection,
                             curie: str) -> tuple[str, ...]:
     """Return every non-empty name associated with the CURIE."""
