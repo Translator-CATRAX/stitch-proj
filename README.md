@@ -726,7 +726,13 @@ correspond to a tagged commit. Perform these steps in order:
 
 1. **Bump the version:** set `version` in `pyproject.toml` to the new
    `X.Y.Z` (it must be greater than the highest version already on
-   PyPI).
+   PyPI). Write it as a bare semantic-version triple **without** a
+   leading `v` (e.g. `version = "0.1.3"`, not `"v0.1.3"`): per
+   [PEP 440](https://peps.python.org/pep-0440/), the `pyproject.toml`
+   `version` must be a plain version string. The `v` prefix belongs
+   only on the git tag in step 6 (`v0.1.3`); `build-release.sh` strips
+   that `v` before checking the tag against `pyproject.toml`, so the
+   two agree even though only the tag carries the `v`.
 2. **Run the checks:** `./run-checks.sh` -- lint and unit tests must
    pass.
 3. **Commit** the version bump and any final changes.
