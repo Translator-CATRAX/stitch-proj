@@ -374,21 +374,22 @@ developers should install the `dev` extra as well (just use
 `run-setup-venv.sh --dev`, which runs `pip install -e ".[dev]"`).
 
 **Keeping `dependencies.txt` in sync.** The file `dependencies.txt` is a
-recorded snapshot of the fully-resolved environment (`pip freeze`), written
-by `document-dependencies.sh`, that provides per-release provenance for the
-declared dependencies above. Because it is a literal snapshot of an installed
-venv, it does **not** update itself when you edit `pyproject.toml`. Whenever
-you add, remove, or change a dependency in `pyproject.toml`, regenerate it as
-a matter of course:
+recorded snapshot of the fully-resolved dependency closure (`pip freeze`),
+written by `document-dependencies.sh`, that provides per-release provenance
+for the declared dependencies above. It does **not** update itself when you
+edit `pyproject.toml`. Whenever you add, remove, or change a dependency in
+`pyproject.toml`, regenerate it as a matter of course:
 ```bash
-rm -rf venv && ./run-setup-venv.sh --dev   # rebuild so the snapshot matches the declarations
-./document-dependencies.sh                  # rewrite dependencies.txt
+./document-dependencies.sh   # rewrite dependencies.txt
 ```
-then commit `dependencies.txt` alongside the `pyproject.toml` change. Skipping
-the venv rebuild lets orphaned packages (ones you removed but `pip` never
-uninstalled) linger in the snapshot -- which is also how stale, vulnerable pins
-end up flagged by Dependabot, since GitHub parses `dependencies.txt` as a pip
-requirements file.
+then commit `dependencies.txt` alongside the `pyproject.toml` change. By
+default the script resolves the closure in a fresh throwaway venv (its
+`--fresh` mode), so the snapshot always matches the declarations exactly:
+no orphaned packages (ones you removed but `pip` never uninstalled) can
+linger in it. That matters because GitHub parses `dependencies.txt` as a
+pip requirements file, so a stale, orphaned pin would be flagged by
+Dependabot. (The `--from-venv` mode freezes the existing `./venv` instead,
+for when you specifically want to record the environment that actually ran.)
 
 # How to run the `stitch-proj` Babel sqlite ingest in AWS
 First, you need to edit `run-ingest-aws.sh` to update the value for the `BABEL_BASE_URL` 
@@ -750,26 +751,23 @@ correspond to a tagged commit. Perform these steps in order:
    only on the git tag in step 7 (`v0.1.3`); `build-release.sh` strips
    that `v` before checking the tag against `pyproject.toml`, so the
    two agree even though only the tag carries the `v`.
-2. **Rebuild the virtualenv from scratch:**
+2. **(Recommended) Rebuild the working venv before the checks:**
    ```bash
    rm -rf venv && ./run-setup-venv.sh --dev
    ```
-   This is essential, not optional. `document-dependencies.sh` (step 5)
-   records `pip freeze` of the *live* venv, and `pip` never uninstalls a
-   package just because it was removed from `pyproject.toml` -- so a
-   dependency you dropped (or a transitive package it pulled in) lingers
-   in an existing venv and would be silently baked into the release's
-   `dependencies.txt`. A from-scratch venv contains exactly the declared
-   dependency closure. Doing this *before* the checks in step 3 has a
-   second payoff: if any code still imports a package you removed from
-   `pyproject.toml`, the fresh venv no longer hides it and `run-checks.sh`
-   will surface the `ImportError`.
+   This is no longer required for `dependencies.txt` -- step 5 now resolves
+   the closure in its own throwaway venv -- but it still has a payoff: if
+   any code still imports a package you removed from `pyproject.toml`, a
+   stale `./venv` hides it, whereas a from-scratch venv makes `run-checks.sh`
+   (step 3) surface the `ImportError`.
 3. **Run the checks:** `./run-checks.sh` -- lint and unit tests must
    pass.
 4. **Commit** the version bump and any final changes.
 5. **Record the environment:** `./document-dependencies.sh` -- this
-   requires a clean working tree, so step 4 must come first; it writes
-   `dependencies.txt` from the freshly rebuilt venv of step 2.
+   requires a clean working tree, so step 4 must come first. By default
+   (its `--fresh` mode) it builds a throwaway venv from `pyproject.toml`
+   and writes `dependencies.txt` from that, so the snapshot is exactly the
+   declared closure regardless of the state of your working `./venv`.
 6. **Commit** `dependencies.txt`.
 7. **Tag the release:** `git tag vX.Y.Z` -- the tag must match the
    `pyproject.toml` version from step 1.
@@ -896,7 +894,8 @@ External contributions are welcome.
   (CI) pipeline set up, so these local checks are the only safeguard
   against breakage.
 - **If you changed dependencies**: if your PR edits dependencies in
-  `pyproject.toml`, rebuild the venv and regenerate `dependencies.txt`
+  `pyproject.toml`, regenerate `dependencies.txt` by running
+  `./document-dependencies.sh`
   (see [Python distribution package requirements](#python-distribution-package-requirements)),
   and commit it with your change.
 - **Commit messages**: each commit should reference an issue number
