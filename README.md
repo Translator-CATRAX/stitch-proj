@@ -373,6 +373,23 @@ The runtime dependencies are `bmt`, `htmllistparse`, `pandas`, and `requests`;
 developers should install the `dev` extra as well (just use
 `run-setup-venv.sh --dev`, which runs `pip install -e ".[dev]"`).
 
+**Keeping `dependencies.txt` in sync.** The file `dependencies.txt` is a
+recorded snapshot of the fully-resolved environment (`pip freeze`), written
+by `document-dependencies.sh`, that provides per-release provenance for the
+declared dependencies above. Because it is a literal snapshot of an installed
+venv, it does **not** update itself when you edit `pyproject.toml`. Whenever
+you add, remove, or change a dependency in `pyproject.toml`, regenerate it as
+a matter of course:
+```bash
+rm -rf venv && ./run-setup-venv.sh --dev   # rebuild so the snapshot matches the declarations
+./document-dependencies.sh                  # rewrite dependencies.txt
+```
+then commit `dependencies.txt` alongside the `pyproject.toml` change. Skipping
+the venv rebuild lets orphaned packages (ones you removed but `pip` never
+uninstalled) linger in the snapshot -- which is also how stale, vulnerable pins
+end up flagged by Dependabot, since GitHub parses `dependencies.txt` as a pip
+requirements file.
+
 # How to run the `stitch-proj` Babel sqlite ingest in AWS
 First, you need to edit `run-ingest-aws.sh` to update the value for the `BABEL_BASE_URL` 
 shell variable to point to the URL for the document root directory on the Babel file
@@ -878,6 +895,10 @@ External contributions are welcome.
   Note: the project does not currently have a continuous-integration
   (CI) pipeline set up, so these local checks are the only safeguard
   against breakage.
+- **If you changed dependencies**: if your PR edits dependencies in
+  `pyproject.toml`, rebuild the venv and regenerate `dependencies.txt`
+  (see [Python distribution package requirements](#python-distribution-package-requirements)),
+  and commit it with your change.
 - **Commit messages**: each commit should reference an issue number
   (e.g., "fix off-by-one in clique mapper (#42)"), unless the commit
   only touches documentation.
