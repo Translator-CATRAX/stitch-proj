@@ -730,23 +730,37 @@ correspond to a tagged commit. Perform these steps in order:
    leading `v` (e.g. `version = "0.1.3"`, not `"v0.1.3"`): per
    [PEP 440](https://peps.python.org/pep-0440/), the `pyproject.toml`
    `version` must be a plain version string. The `v` prefix belongs
-   only on the git tag in step 6 (`v0.1.3`); `build-release.sh` strips
+   only on the git tag in step 7 (`v0.1.3`); `build-release.sh` strips
    that `v` before checking the tag against `pyproject.toml`, so the
    two agree even though only the tag carries the `v`.
-2. **Run the checks:** `./run-checks.sh` -- lint and unit tests must
+2. **Rebuild the virtualenv from scratch:**
+   ```bash
+   rm -rf venv && ./run-setup-venv.sh --dev
+   ```
+   This is essential, not optional. `document-dependencies.sh` (step 5)
+   records `pip freeze` of the *live* venv, and `pip` never uninstalls a
+   package just because it was removed from `pyproject.toml` -- so a
+   dependency you dropped (or a transitive package it pulled in) lingers
+   in an existing venv and would be silently baked into the release's
+   `dependencies.txt`. A from-scratch venv contains exactly the declared
+   dependency closure. Doing this *before* the checks in step 3 has a
+   second payoff: if any code still imports a package you removed from
+   `pyproject.toml`, the fresh venv no longer hides it and `run-checks.sh`
+   will surface the `ImportError`.
+3. **Run the checks:** `./run-checks.sh` -- lint and unit tests must
    pass.
-3. **Commit** the version bump and any final changes.
-4. **Record the environment:** `./document-dependencies.sh` -- this
-   requires a clean working tree, so step 3 must come first; it writes
-   `dependencies.txt`.
-5. **Commit** `dependencies.txt`.
-6. **Tag the release:** `git tag vX.Y.Z` -- the tag must match the
+4. **Commit** the version bump and any final changes.
+5. **Record the environment:** `./document-dependencies.sh` -- this
+   requires a clean working tree, so step 4 must come first; it writes
+   `dependencies.txt` from the freshly rebuilt venv of step 2.
+6. **Commit** `dependencies.txt`.
+7. **Tag the release:** `git tag vX.Y.Z` -- the tag must match the
    `pyproject.toml` version from step 1.
-7. **Push** the commits and the tag:
+8. **Push** the commits and the tag:
    ```bash
    git push && git push --tags
    ```
-8. **Build from a fresh checkout of the tag,** in a directory separate
+9. **Build from a fresh checkout of the tag,** in a directory separate
    from your working clone:
    ```bash
    git clone https://github.com/Translator-CATRAX/stitch-proj.git stitch-proj-release
@@ -759,8 +773,8 @@ correspond to a tagged commit. Perform these steps in order:
    ```
    `build-release.sh` re-verifies the tag, the version match, and a
    clean tree before building (see [§4](#4-build-the-package)).
-9. **Verify the artifacts:** `twine check dist/*`.
-10. **Upload to PyPI:** `twine upload dist/*`.
+10. **Verify the artifacts:** `twine check dist/*`.
+11. **Upload to PyPI:** `twine upload dist/*`.
 
 # Cleaning build artifacts
 
@@ -777,7 +791,7 @@ in the repository (it `cd`s to the repo root itself):
 You should run it:
 
 - **Immediately before re-running `python -m build` to publish a new
-  release** (it is step 2 of the
+  release** (it runs as part of the build step -- step 9 -- of the
   [Versioning workflow](#8-versioning-workflow) above), so the new wheel
   and source distribution are assembled from a clean staging tree.
 - **After switching git branches or after a rebase** that changes

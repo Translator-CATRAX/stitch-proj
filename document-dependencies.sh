@@ -12,6 +12,14 @@
 # so the recorded Git HEAD faithfully represents the code. Untracked
 # files are not fatal but produce a warning on stderr.
 #
+# IMPORTANT: this records `pip freeze` of the live venv AS-IS. `pip` never
+# uninstalls a package just because it was dropped from pyproject.toml, so
+# an existing venv can carry orphaned (no-longer-declared) packages that
+# would be silently baked into dependencies.txt. Run this only against a
+# freshly rebuilt venv (`rm -rf venv && ./run-setup-venv.sh --dev`) so the
+# snapshot reflects exactly the declared dependency closure. See the
+# "Versioning workflow" section of README.md.
+#
 set -euo pipefail
 
 # Run from the repository root (where venv/ and dependencies.txt live),
