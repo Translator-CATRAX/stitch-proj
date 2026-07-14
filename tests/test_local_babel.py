@@ -4,11 +4,14 @@ import sqlite3
 
 import pytest
 from stitch.local_babel import (
+    _batch_tuple,
+    _map_with_batching,
     connect_to_db_read_only,
     get_all_names_for_curie,
     get_categories_for_curie,
     get_label_for_curie,
     get_n_random_curies,
+    get_table_row_counts,
     get_taxon_for_gene_or_protein,
     map_any_curie_to_cliques,
     map_curie_to_conflation_curies,
@@ -370,3 +373,77 @@ def test_map_name_to_curie_real_db(readonly_conn: sqlite3.Connection):
     assert isinstance(curie, str) and curie != ""
     assert isinstance(matched_label, str) and matched_label != ""
     assert not curie.startswith("PMID:")
+
+def test_batch_tuple():
+    result = _batch_tuple((1, 2, 3, 4, 5), 2)
+    assert result == ((1, 2), (3, 4), (5,))
+    result = _batch_tuple((), 5)
+    assert result == ()
+    result = _batch_tuple((1, 2, 3), 10)
+    assert result == ((1, 2, 3),)
+
+
+def test_batch_tuple_size_one():
+    assert _batch_tuple((1, 2, 3), 1) == ((1,), (2,), (3,))
+
+
+def test_batch_tuple_invalid_batch_size():
+    with pytest.raises(ZeroDivisionError):
+        _batch_tuple((1, 2, 3), 0)
+    # negative batch_size silently yields no batches rather than raising
+    assert _batch_tuple((1, 2, 3), -1) == ()
+
+
+def test_map_with_batching():
+    result = _map_with_batching((1, 2, 3, 4, 5),
+                                lambda batch: [x * 2 for x in batch],
+                                None,
+                                max_batch_size=2)
+    assert set(result) == {2, 4, 6, 8, 10}
+    result = _map_with_batching((), lambda batch: [], None)
+    assert result == ()
+
+
+def test_get_table_row_counts():
+    conn = sqlite3.connect(":memory:")
+    conn.executescript("""
+        CREATE TABLE t1 (id INTEGER PRIMARY KEY, name TEXT);
+        INSERT INTO t1 VALUES (1, 'a'), (2, 'b');
+        CREATE TABLE t2 (id INTEGER PRIMARY KEY, name TEXT);
+        INSERT INTO t2 VALUES (1, 'c');
+    """)
+    counts = get_table_row_counts(conn)
+    assert counts['t1'] == 2
+    assert counts['t2'] == 1
+
+
+def test_get_table_row_counts_zero_rows():
+    conn = sqlite3.connect(":memory:")
+    conn.executescript("CREATE TABLE empty_table (id INTEGER PRIMARY KEY);")
+    counts = get_table_row_counts(conn)
+    assert counts == {"empty_table": 0}
+
+
+def test_get_table_row_counts_empty_database():
+    conn = sqlite3.connect(":memory:")
+    counts = get_table_row_counts(conn)
+    assert counts == {}
+
+
+def test_map_curie_to_conflation_curies_gene_protein(readonly_conn):
+    curies = map_curie_to_conflation_curies(readonly_conn,
+                                            "NCBIGene:3569", "GeneProtein")
+    assert len(curies) >= 1
+    curies = map_curie_to_conflation_curies(readonly_conn,
+                                            "XYZZY:999999", "GeneProtein")
+    assert not curies
+
+
+def test_map_pref_curie_to_synonyms_unknown_curie(readonly_conn: sqlite3.Connection):
+    result = map_pref_curie_to_synonyms(readonly_conn.cursor(), "XYZZY:does_not_exist")
+    assert result == set()
+
+
+def test_map_preferred_curie_to_cliques_unknown_curie(readonly_conn: sqlite3.Connection):
+    result = map_preferred_curie_to_cliques(readonly_conn, "XYZZY:does_not_exist")
+    assert result == ()
