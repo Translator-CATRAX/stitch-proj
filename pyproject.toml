@@ -37,6 +37,12 @@ dev = [
     "vulture>=2.14",
 ]
 
+[project.urls]
+Homepage = "https://github.com/Translator-CATRAX/stitch-proj"
+Repository = "https://github.com/Translator-CATRAX/stitch-proj"
+Changelog = "https://github.com/Translator-CATRAX/stitch-proj/blob/main/CHANGELOG.md"
+Issues = "https://github.com/Translator-CATRAX/stitch-proj/issues"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["stitch", "stitch.*"]

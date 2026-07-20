@@ -751,6 +751,10 @@ correspond to a tagged commit. Perform these steps in order:
    only on the git tag in step 7 (`v0.1.3`); `build-release.sh` strips
    that `v` before checking the tag against `pyproject.toml`, so the
    two agree even though only the tag carries the `v`.
+   Also **update `CHANGELOG.md`**: move the accumulated `[Unreleased]`
+   notes under a new `## [X.Y.Z] - YYYY-MM-DD` heading and add the
+   matching link reference at the bottom of the file, so the release's
+   changes are recorded before you commit and tag.
 2. **(Recommended) Rebuild the working venv before the checks:**
    ```bash
    rm -rf venv && ./run-setup-venv.sh --dev
