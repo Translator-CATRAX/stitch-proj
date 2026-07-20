@@ -1,8 +1,13 @@
 # stitch-proj
 This project is a collection of tools for ingesting and querying the 
-[Babel concept identifier normalization database](https://github.com/TranslatorSRI/Babel)  as a local sqlite database. 
+[Babel concept identifier normalization database](https://github.com/TranslatorSRI/Babel) as a local sqlite database. 
 The ingest tools automatically download Babel using "compendia" and "conflation" files from a distribution specific
-[file downloads directory on the Babel webserver](https://stars.renci.org/var/babel).
+[file downloads directory on the Babel webserver](https://stars.renci.org/var/babel). 
+The project also provides a python interface for querying the sqlite database. 
+Versioned releases of the stitch-proj project's code are available as 
+distribution packages on the Python Package Index (PyPI) at
+[pypi.org/project/stitch-proj](https://pypi.org/project/stitch-proj/). Releases of the Babel sqlite
+database are made available via the [stitch-proj GitHub releases sub-page](https://github.com/Translator-CATRAX/stitch-proj/releases).
 
 # Table of Contents
 
