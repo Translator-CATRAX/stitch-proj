@@ -340,7 +340,7 @@ def _ingest_biolink_categories(conn: sqlite3.Connection,
 
 def _byte_count_chunk(chunk: ChunkType) -> int:
     dumpable = chunk.to_dict(orient='records') \
-        if isinstance(chunk, pd.core.frame.DataFrame) \
+        if isinstance(chunk, pd.DataFrame) \
            else chunk
     return len(json.dumps(dumpable))
 
@@ -522,8 +522,7 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                                    .pkid
                                    .isna())][['curie', 'label']]
                     .groupby(by='curie')
-                    .apply(_first_label,
-                           include_groups=False)
+                    .apply(_first_label)
                     .itertuples(index=True,
                                 name=None))}))
         curies_to_pkids = \

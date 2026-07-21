@@ -444,6 +444,8 @@ def test_map_pref_curie_to_synonyms_unknown_curie(readonly_conn: sqlite3.Connect
     assert result == set()
 
 
-def test_map_preferred_curie_to_cliques_unknown_curie(readonly_conn: sqlite3.Connection):
+def test_map_preferred_curie_to_cliques_unknown_curie(
+        readonly_conn: sqlite3.Connection
+):
     result = map_preferred_curie_to_cliques(readonly_conn, "XYZZY:does_not_exist")
     assert result == ()
