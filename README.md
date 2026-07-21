@@ -525,9 +525,24 @@ tests:
 cd stitch-proj
 source venv/bin/activate
 bash -x run-integration-tests.sh
+tail run-integration-tests.log
 ```
 Note, running the integration tests takes a long time (an hour and 15 minutes
-at last check).
+at last check). When you run `tail run-integration-tests.log`, this output
+would indicate that the integration tests ran successfully:
+```
+((venv) ) sramsey-laptop:stitch-proj sramsey$ tail run-integration-tests.log
+2026-07-21 10:21:43-07:00: completed ANALYZE
+2026-07-21 10:21:43-07:00: running ANALYZE took: 000:00:05 (HHH:MM::SS)
+2026-07-21 10:21:43-07:00: setting PRAGMA locking_mode=EXCLUSIVE
+2026-07-21 10:21:43-07:00: starting database VACUUM
+2026-07-21 10:22:07-07:00: completed database VACUUM
+2026-07-21 10:22:07-07:00: running PRAGMA integrity_check
+2026-07-21 10:23:08-07:00: setting PRAGMA locking_mode=NORMAL
+2026-07-21 10:23:08-07:00: final cleanup (VACUUM, ANALYZE, and integrity check combined) took: 000:01:30 (HHH:MM::SS)
+2026-07-21 10:23:08-07:00: Total number of chunks inserted: 126
+2026-07-21 10:23:08-07:00: Finished database ingest. Total elapsed time: 000:28:38 (HHH:MM::SS)
+```
 
 # Analyzing the local Babel sqlite database
 If you are a developer looking to improve `local_babel.py`, 
