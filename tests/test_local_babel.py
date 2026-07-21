@@ -388,10 +388,10 @@ def test_batch_tuple_size_one():
 
 
 def test_batch_tuple_invalid_batch_size():
-    with pytest.raises(ZeroDivisionError):
+    with pytest.raises(ValueError):
         _batch_tuple((1, 2, 3), 0)
-    # negative batch_size silently yields no batches rather than raising
-    assert _batch_tuple((1, 2, 3), -1) == ()
+    with pytest.raises(ValueError):
+        _batch_tuple((1, 2, 3), -1)
 
 
 def test_map_with_batching():
