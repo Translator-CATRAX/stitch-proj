@@ -115,6 +115,8 @@ def _batch_tuple(x: tuple[T, ...], batch_size: int) -> tuple[tuple[T, ...], ...]
     ValueError
         If `batch_size` is less than 1.
     """
+    if batch_size < 1:
+        raise ValueError(f"batch_size must be >= 1; got: {batch_size}")
     it = iter(x)
     return tuple(
         tuple(itertools.islice(it, batch_size))
