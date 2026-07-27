@@ -416,6 +416,11 @@ download webserver, for the most recent distribution of Babel. Then, follow thes
 After approximately 37 hours, the ingest script should complete, leaving 
 the finished database as a file
 `/home/ubuntu/stitch-proj/babel.sqlite` (see `Requirements` for the expected size). 
+
+**Important**: Before stopping the instance, you have to copy the `babel.sqlite` file
+from `/mnt/localssd/stitch-proj` to `/home/ubuntu`. Otherwise, the database file will be
+lost when you stop the instance.
+
 The `ingest_babel.py` script (internally) turns off buffering for the `stdout`
 and `stderr` streams, so that output logging information is seen immediately
 in the logfile as soon as an update is "printed" by the python script.
