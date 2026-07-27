@@ -7,7 +7,7 @@ STITCH_DIR=.
 # via the "--temp-dir" command-line option for ingest_babel.py:
 STITCH_LOG_FILE=${STITCH_DIR}/run-integration-tests.log
 STITCH_SQLITE_FILE=${STITCH_DIR}/babel.sqlite
-BABEL_BASE_URL=https://stars.renci.org/var/babel_outputs/2025sep1
+BABEL_BASE_URL=https://stars.renci.org/var/babel_outputs/2026jul22
 BABEL_COMPENDIA_BASE_URL=${BABEL_BASE_URL}/compendia/
 BABEL_CONFLATION_BASE_URL=${BABEL_BASE_URL}/conflation/
 # Directory holding a hand-trimmed DrugChemical.txt for test 3 (must contain
