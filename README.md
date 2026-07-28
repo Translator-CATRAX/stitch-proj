@@ -399,7 +399,21 @@ for when you specifically want to record the environment that actually ran.)
 # How to run the `stitch-proj` Babel sqlite ingest in AWS
 First, you need to edit `run-ingest-aws.sh` to update the value for the `BABEL_BASE_URL` 
 shell variable to point to the URL for the document root directory on the Babel file
-download webserver, for the most recent distribution of Babel. Then, follow these steps:
+download webserver, for the most recent distribution of Babel. 
+
+Second, you should run `df` and make sure that there is sufficient disk space (at least 250 GiB)
+for the build, in whatever filesystem `/home/ubuntu/stitch-proj/tmp` is located in.
+
+Third, make sure you tag the precise code version you are using for the ingest, like this
+(you should be in the `stitch-proj` code directory in a checkout that has permissions
+to push changes to the GitHub remote):
+```
+git tag ISODATE
+git push origin ISODATE
+```
+where ISODATE is the ISO date of the Babel release, like 20260722.
+
+Then, to run the ingest, follow these steps:
 - `ssh ubuntu@my-build-instance.rtx.ai` (if running in AWS); else just create a new `bash` session
 - [If you are running in an `i4i` AWS instance with a local SSD, run this command: 
 `curl -fsSL https://raw.githubusercontent.com/Translator-CATRAX/stitch-proj/refs/heads/main/tools/setup-i4i-instance.sh | bash`]
