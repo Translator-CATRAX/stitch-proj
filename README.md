@@ -424,10 +424,10 @@ in a bash session]
 - `cd stitch-proj`
 - `screen` (to enter a screen session)
 - `./instance-memory-tracker.sh`
-- `ctrl-X D` (to exit the screen session)
+- `ctrl-A D` (to exit the screen session)
 - `screen` (to enter a second screen session)
 - `./run-ingest-aws.sh`
-- `ctrl-X D` (to exit the second screen session)
+- `ctrl-A D` (to exit the second screen session)
 - `tail -f ingest-babel.log` (so you can watch progress)
 - In another terminal session, watch memory usage using `top`
 
