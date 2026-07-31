@@ -35,6 +35,7 @@ database are made available via the [stitch-proj GitHub releases sub-page](https
 - [Running the type checks, lint checks, dead code checks, and unit tests](#running-the-type-checks-lint-checks-dead-code-checks-and-unit-tests)
 - [How to run just the unit test suite](#how-to-run-just-the-unit-test-suite)
 - [How to run the integration tests of `ingest_babel.py`](#how-to-run-the-integration-tests-of-ingest_babelpy)
+- [Regenerating the test-3 conflation fixture for a new Babel release](#regenerating-the-test-3-conflation-fixture-for-a-new-babel-release)
 - [Analyzing the local Babel sqlite database](#analyzing-the-local-babel-sqlite-database)
 - [How to regenerate the schema diagram](#how-to-regenerate-the-schema-diagram)
 - [Inspecting a built Babel sqlite database file](#inspecting-a-built-babel-sqlite-database-file)
@@ -546,6 +547,13 @@ source venv/bin/activate
 bash -x run-integration-tests.sh
 tail run-integration-tests.log
 ```
+> **If you have pointed the tests at a new Babel release** (i.e. changed
+> `BABEL_BASE_URL` in `run-integration-tests.sh`), first regenerate the test-3
+> conflation fixture — see
+> [Regenerating the test-3 conflation fixture for a new Babel release](#regenerating-the-test-3-conflation-fixture-for-a-new-babel-release).
+> Otherwise test 3 may abort with a `canonical CURIE not found in identifiers`
+> error.
+
 Note, running the integration tests takes a long time (31 minutes
 at last check). When you run `tail run-integration-tests.log`, this output
 would indicate that the integration tests ran successfully (the final test is
@@ -563,6 +571,53 @@ test 4, which ingests `umls.txt`):
 2026-07-30 13:40:27-07:00: Total number of chunks inserted: 13
 2026-07-30 13:40:27-07:00: Finished database ingest. Total elapsed time: 000:01:31 (HHH:MM::SS)
 ```
+
+# Regenerating the test-3 conflation fixture for a new Babel release
+Integration test 3 (`ingest_babel.py --test-type=3`) ingests only a small
+subset of the Babel compendia (`Drug.txt`, `ChemicalEntity.txt`, and the first
+`SmallMolecule.txt.01` shard) and then ingests a hand-trimmed conflation
+fixture, `test-artifacts/DrugChemical-test.txt`. Every cluster in that fixture
+must reference only CURIEs present in that compendia subset; otherwise the
+conflation ingest aborts with an error such as:
+```
+ValueError: canonical CURIE not found in identifiers: CHEBI:8310
+```
+The fixture is a static file, but each Babel release reshuffles clique
+membership and `SmallMolecule` shard boundaries, so a fixture that was valid for
+one release can reference CURIEs that have since moved into shards test 3 does
+not load. **Whenever you point the integration tests at a new Babel release**
+(i.e. after changing `BABEL_BASE_URL` in `run-integration-tests.sh`), regenerate
+the fixture *before* running the tests:
+```
+cd stitch-proj
+source venv/bin/activate
+python tools/refresh_test3_fixture.py \
+    --babel-compendia-url https://stars.renci.org/var/babel_outputs/<RELEASE>/compendia/
+```
+where `<RELEASE>` matches the release in `BABEL_BASE_URL` (e.g. `2026jul22`).
+The script scans those three compendia directly for the set of identifier
+CURIEs they contain, then rewrites `test-artifacts/DrugChemical-test.txt`,
+keeping only the clusters whose members all fall in that set (and preserving a
+few clusters with duplicated members that exercise the ingest's de-duplication
+path). It builds **no** sqlite database — no ingest, no indexing, no VACUUM — so
+it is safe and cheap to run before doing any real ingest. Its runtime is
+dominated by downloading the multi-GB `SmallMolecule.txt.01` shard, so it is
+bandwidth-bound, but still much lighter than a full test-3 ingest.
+
+There are two modes:
+- **default** (shown above): filter the *existing* fixture in place, dropping
+  only the clusters that have gone stale. Downloads just the three compendia and
+  keeps the curated subset stable.
+- **`--from-release`**: instead download the release's full
+  `conflation/DrugChemical.txt` and filter *that*, so the fixture also picks up
+  brand-new clusters rather than only shrinking. Pass
+  `--babel-conflation-url https://stars.renci.org/var/babel_outputs/<RELEASE>/conflation/`
+  if the conflation directory is not at the default release location.
+
+Run `python tools/refresh_test3_fixture.py --help` for all options. Run it from
+the repository root (it writes the relative path `test-artifacts/...` and
+imports the installed `stitch` package). After regenerating, run the integration
+tests to confirm, then commit the updated `test-artifacts/DrugChemical-test.txt`.
 
 # Analyzing the local Babel sqlite database
 If you are a developer looking to improve `local_babel.py`, 
