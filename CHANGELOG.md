@@ -34,6 +34,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Regenerated `dependencies.txt` from a clean environment, removing an orphaned
   `ray` pin (and bumping `urllib3`/`idna`/`requests`/`pytest` past their
   advisories), clearing the repository's Dependabot alerts.
+- `ingest_babel.py` now selects compendia chunk columns by name (see
+  `COMPENDIA_COLUMNS`) instead of by tuple position, and raises a clear error if
+  an expected column is absent. Babel does not guarantee a stable JSON key order
+  across compendia files, and a chunk's column order follows that key order.
+- `run-integration-tests.sh` now also runs test type 4 (`umls.txt`), which had
+  been supported by `ingest_babel.py` since the `#47` commit but was never added
+  to the script, leaving that file with no automated coverage.
+
+### Fixed
+- Ingest of `umls.txt` failed with `KeyError: None` starting with the Babel
+  2026jul22 release: `umls.txt` had listed `identifiers` last, and the
+  filename-keyed special case that reordered its columns was still being applied
+  after Babel moved that file to the same key order as the other compendia
+  files. The special case is removed.
+- The `row_id` reported in the "taxon missing from database" error named an
+  identifier primary key rather than the chunk row, because of an off-by-one in
+  a positional row unpacking.
 
 ## [0.1.3] - 2026-06-10
 

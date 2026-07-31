@@ -39,3 +39,13 @@ ${INGEST_BABEL_CMD} \
              --database-file-name ${STITCH_SQLITE_FILE} \
              --test-type=3 \
              >>${STITCH_LOG_FILE} 2>&1
+
+# Test 4 ingests umls.txt (ingest_babel.py:TEST_4_COMPENDIA). That file is not
+# covered by tests 1-3, and its JSON key order has changed across Babel
+# releases, so it is worth exercising on its own before a full ingest.
+${INGEST_BABEL_CMD} \
+             --babel-compendia-url ${BABEL_COMPENDIA_BASE_URL} \
+             --babel-conflation-url ${BABEL_CONFLATION_BASE_URL} \
+             --database-file-name ${STITCH_SQLITE_FILE} \
+             --test-type=4 \
+             >>${STITCH_LOG_FILE} 2>&1

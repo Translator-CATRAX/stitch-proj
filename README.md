@@ -535,8 +535,8 @@ won't be able to find the sqlite database that it depends on, and
 you will get a large number of errors from that unit test module.
 
 # How to run the integration tests of `ingest_babel.py`
-Running all three integration tests of `ingest_babel.py` 
-may take up to an hour (and will require a fast Internet connection, 
+Running all four integration tests of `ingest_babel.py` 
+may take half an hour or more (and will require a fast Internet connection, 
 since the integration tests ingest various Babel compendia and
 conflation files, which they load remotely via HTTPS). To run the
 tests:
@@ -546,21 +546,22 @@ source venv/bin/activate
 bash -x run-integration-tests.sh
 tail run-integration-tests.log
 ```
-Note, running the integration tests takes a long time (an hour and 15 minutes
+Note, running the integration tests takes a long time (31 minutes
 at last check). When you run `tail run-integration-tests.log`, this output
-would indicate that the integration tests ran successfully:
+would indicate that the integration tests ran successfully (the final test is
+test 4, which ingests `umls.txt`):
 ```
 ((venv) ) sramsey-laptop:stitch-proj sramsey$ tail run-integration-tests.log
-2026-07-21 10:21:43-07:00: completed ANALYZE
-2026-07-21 10:21:43-07:00: running ANALYZE took: 000:00:05 (HHH:MM::SS)
-2026-07-21 10:21:43-07:00: setting PRAGMA locking_mode=EXCLUSIVE
-2026-07-21 10:21:43-07:00: starting database VACUUM
-2026-07-21 10:22:07-07:00: completed database VACUUM
-2026-07-21 10:22:07-07:00: running PRAGMA integrity_check
-2026-07-21 10:23:08-07:00: setting PRAGMA locking_mode=NORMAL
-2026-07-21 10:23:08-07:00: final cleanup (VACUUM, ANALYZE, and integrity check combined) took: 000:01:30 (HHH:MM::SS)
-2026-07-21 10:23:08-07:00: Total number of chunks inserted: 126
-2026-07-21 10:23:08-07:00: Finished database ingest. Total elapsed time: 000:28:38 (HHH:MM::SS)
+2026-07-30 13:40:23-07:00: completed ANALYZE
+2026-07-30 13:40:23-07:00: running ANALYZE took: 000:00:00 (HHH:MM::SS)
+2026-07-30 13:40:23-07:00: setting PRAGMA locking_mode=EXCLUSIVE
+2026-07-30 13:40:23-07:00: starting database VACUUM
+2026-07-30 13:40:25-07:00: completed database VACUUM
+2026-07-30 13:40:25-07:00: running PRAGMA integrity_check
+2026-07-30 13:40:27-07:00: setting PRAGMA locking_mode=NORMAL
+2026-07-30 13:40:27-07:00: final cleanup (VACUUM, ANALYZE, and integrity check combined) took: 000:00:04 (HHH:MM::SS)
+2026-07-30 13:40:27-07:00: Total number of chunks inserted: 13
+2026-07-30 13:40:27-07:00: Finished database ingest. Total elapsed time: 000:01:31 (HHH:MM::SS)
 ```
 
 # Analyzing the local Babel sqlite database

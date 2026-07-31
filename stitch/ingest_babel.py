@@ -15,8 +15,9 @@ files and builds a SQLite database with these tables (see code for the full DDL)
 - conflation_clusters, conflation_members
 This script should take approximately 28 hours to run, on an i4i.2xlarge instance.
 Compendia files are json-lines (read in chunks); conflation files
-are one Python list literal per line. The UMLS compendia (`umls.txt`) has a
-different key order and is handled specially.
+are one Python list literal per line. Compendia chunk columns are selected by
+name, since Babel does not guarantee a consistent JSON key order across files
+(`umls.txt` used a different order through the 2025sep1 release).
 Thank you to Gaurav Vaidya for helpful information about Babel.
 
 Key Features
@@ -54,7 +55,7 @@ Test Modes
 2: Ingest a small, fixed subset of compendia files (smoke test).
 3: Ingest a selected compendia subset then a selected conflation file; missing
    taxa insertion is disabled.
-4: Ingest UMLS compendia only (different column order).
+4: Ingest UMLS compendia only.
 
 How To Run (example)
 --------------------
@@ -467,27 +468,37 @@ def _get_biolink_type_pkids_from_curies(cursor: sqlite3.Cursor, curies: Sequence
                                 f"({placeholders})",
                                 curies).fetchall()))
 
+# Columns of a compendia JSON-lines record. Babel does not guarantee a
+# consistent key order across compendia files (`umls.txt` listed
+# `identifiers` last through the 2025sep1 release, and moved it into this
+# order in 2026jul22), and a chunk DataFrame takes its column order from the
+# JSON key order, so columns are always selected by name, never by position.
+COMPENDIA_COLUMNS = ('type', 'ic', 'identifiers', 'preferred_name', 'taxa')
+
 def _make_compendia_chunk_processor(conn: sqlite3.Connection,
-                                    insrt_msng_taxa: bool = False,
-                                    non_umls_compendia_file: bool = True) -> Callable:
+                                    insrt_msng_taxa: bool = False) -> Callable:
     # pylint: disable=too-many-locals
     def process_compendia_chunk(chunk: pd.DataFrame):
+        missing_columns = tuple(column for column in COMPENDIA_COLUMNS
+                                if column not in chunk.columns)
+        if missing_columns:
+            raise ValueError("compendia chunk is missing expected column(s): "
+                             f"{missing_columns}; columns present: "
+                             f"{tuple(chunk.columns)}")
         cursor = conn.cursor()
         biolink_curie_to_pkid = \
             _get_biolink_type_pkids_from_curies(cursor, tuple(chunk['type'].unique()))
         chunk_data_unpk: dict[str, Any] = {'primary_curies': [],
                                            'curies_and_info': [],
                                            'data_to_insert_cliques': []}
-        for row_id, row in enumerate(chunk.itertuples(index=False, name=None)):
-            # For a non-umls compendia file, the order of the "row" tuple is:
-            #   biolink_type, ic, identifiers, preferred_name, taxa
-            # For "umls.txt" it is: biolink_type, ic, preferred_name, taxa, identifiers
-            if not non_umls_compendia_file:
-                row = tuple(row[i] for i in (0, 1, 4, 2, 3))
+        for row_id, (biolink_type, ic, identifs, preferred_name, _) in \
+                enumerate(zip(*(chunk[column] for column in COMPENDIA_COLUMNS))):
+            if not identifs:
+                raise ValueError("clique has no identifiers, at chunk row "
+                                 f"{row_id}; preferred name: {preferred_name}")
             chunk_data_unpk['primary_curies'].append(cast(list[dict[str, Any]],
-                                                          row[2])[0]['i']
-                                                     if row[2] else None)
-            for ci, identif_struct in enumerate(row[2]):
+                                                          identifs)[0]['i'])
+            for ci, identif_struct in enumerate(identifs):
                 (chunk_data_unpk['curies_and_info']
                  .append((identif_struct['i'],
                           identif_struct.get('l'),
@@ -495,11 +506,12 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                           identif_struct.get('t'),
                           row_id)))
             (chunk_data_unpk['data_to_insert_cliques']
-             .append((su.nan_to_none(row[1]),
-                      biolink_curie_to_pkid[row[0]], row[3])))
+             .append((su.nan_to_none(ic),
+                      biolink_curie_to_pkid[biolink_type], preferred_name)))
         chunk['primary_curie'] = chunk_data_unpk['primary_curies']
-        # curies_df has four columns: curie, label, cis, and taxa;
-        # each row corresponds to a different identifier in the chunk
+        # curies_df has five columns: curie, label, cis, taxa, and chunk_row
+        # (a sixth, pkid, is added just below); each row corresponds to a
+        # different identifier in the chunk
         curies_df = \
             pd.DataFrame.from_records(chunk_data_unpk['curies_and_info'],
                                       columns=('curie', 'label', 'cis', 'taxa',
@@ -530,7 +542,7 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
         taxa = set(_flatten_taxa(curies_df['taxa']))
         if taxa:
             taxon_row_map: dict[str, int] = {}
-            for _, _, _, row_taxa, _, chunk_row in curies_df.itertuples(
+            for row_taxa, chunk_row in curies_df[['taxa', 'chunk_row']].itertuples(
                     index=False, name=None):
                 if row_taxa:
                     for taxon in cast(list[str], row_taxa):
@@ -543,8 +555,9 @@ def _make_compendia_chunk_processor(conn: sqlite3.Connection,
                                '(identifier_id, taxa_identifier_id) '
                                'VALUES (?, ?);',
                                tuple((curies_to_pkids[row_curie], taxa_to_pkids[t])
-                                     for row_curie, _, _, row_taxa, _, _
-                                     in curies_df.itertuples(index=False, name=None)
+                                     for row_curie, row_taxa
+                                     in curies_df[['curie', 'taxa']].itertuples(
+                                         index=False, name=None)
                                      for t in cast(list[str], row_taxa)))
         chunk['clique_pkid'] = \
             tuple(_insert_and_return_id(cursor,
@@ -825,10 +838,11 @@ def _get_make_chunkproc_args_conflation(file_to_id_map: dict[str, int],
 
 def _get_make_chunkproc_args_compendia(insrt_msng_taxa: bool,
                                        file_name:str) -> dict[str, Any]:
-    # Babel's umls.txt file has a different key order than other compendia files
-    non_umls_compendia_file = file_name != 'umls.txt'
-    return {'insrt_msng_taxa': insrt_msng_taxa,
-            'non_umls_compendia_file': non_umls_compendia_file}
+    # `file_name` is unused: compendia chunks are handled uniformly, by column
+    # name (see COMPENDIA_COLUMNS). It is part of the MakeChunkProcArgs
+    # signature, which the conflation variant does use.
+    # pylint: disable=unused-argument
+    return {'insrt_msng_taxa': insrt_msng_taxa}
 
 def _make_ingest_urls(dry_run: bool) -> Callable:
     # pylint: disable=too-many-arguments,too-many-positional-arguments
