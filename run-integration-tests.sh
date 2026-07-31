@@ -10,9 +10,10 @@ STITCH_SQLITE_FILE=${STITCH_DIR}/babel.sqlite
 BABEL_BASE_URL=https://stars.renci.org/var/babel_outputs/2026jul22
 BABEL_COMPENDIA_BASE_URL=${BABEL_BASE_URL}/compendia/
 BABEL_CONFLATION_BASE_URL=${BABEL_BASE_URL}/conflation/
-# Directory holding a hand-trimmed DrugChemical.txt for test 3 (must contain
-# a file literally named "DrugChemical.txt" -- the filename is hardcoded in
-# ingest_babel.py:TEST_3_CONFLATION).
+# Directory holding a hand-trimmed DrugChemical-test.txt for test 3 (must
+# contain a file literally named "DrugChemical-test.txt" -- the filename is
+# hardcoded in ingest_babel.py:TEST_3_CONFLATION. Regenerate it for a new
+# Babel release with: python tools/refresh_test3_fixture.py).
 TEST_ARTIFACTS_DIR=${STITCH_DIR}/test-artifacts
 INGEST_BABEL_CMD=venv/bin/ingest-babel
 

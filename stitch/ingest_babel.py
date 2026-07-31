@@ -698,7 +698,13 @@ def _create_indices(conn: sqlite3.Connection,
 TEST_2_COMPENDIA = ('OrganismTaxon.txt', 'ComplexMolecularMixture.txt',
                     'Polypeptide.txt', 'PhenotypicFeature.txt')
 TEST_3_COMPENDIA = ('Drug.txt', 'ChemicalEntity.txt', 'SmallMolecule.txt.01')
-TEST_3_CONFLATION = ('DrugChemical.txt',)
+# The test-3 conflation fixture is a hand-trimmed copy of the real Babel
+# DrugChemical conflation file; its filename carries a "-test" marker so it is
+# not mistaken for a genuine Babel conflation file. Because the conflation
+# *type* is normally derived from the filename, TEST_3_CONFLATION_TYPE records
+# the real type the fixture stands in for (see the test_type == 3 branch).
+TEST_3_CONFLATION = ('DrugChemical-test.txt',)
+TEST_3_CONFLATION_TYPE = 'DrugChemical'
 TEST_4_COMPENDIA = ('umls.txt',)
 TAXON_FILE = 'OrganismTaxon.txt'
 FILE_NAME_SUFFIX_START_NUMBERED = COMPENDIA_FILE_SUFFIX + '.00'
@@ -991,8 +997,15 @@ def _main_args(babel_compendia_url: str,
                 "get_make_chunk_processor_args":
                 _make_get_make_chunkproc_args_compendia(insrt_msng_taxa=False)})
             glbl_chnk_cnt = ingest_urls(**ingest_args_compendia)
+            # The fixture is named "<Type>-test.txt", so its conflation type
+            # cannot be derived from the filename; supply it explicitly.
+            test_3_conflation_type_id = \
+                su.CONFLATION_TYPE_NAMES_IDS[TEST_3_CONFLATION_TYPE]
             ingest_args_conflation.update({
                 "file_names": TEST_3_CONFLATION,
+                "get_make_chunk_processor_args":
+                lambda _file_name: {'conflation_type_id':
+                                    test_3_conflation_type_id},
                 "glbl_chnk_cnt": glbl_chnk_cnt})
             glbl_chnk_cnt = ingest_urls(**ingest_args_conflation)
         elif test_type == 4:
