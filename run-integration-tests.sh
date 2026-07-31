@@ -6,7 +6,11 @@ STITCH_DIR=.
 # resolved issue 17, with the temp dir being able to be specified only
 # via the "--temp-dir" command-line option for ingest_babel.py:
 STITCH_LOG_FILE=${STITCH_DIR}/run-integration-tests.log
-STITCH_SQLITE_FILE=${STITCH_DIR}/babel.sqlite
+# Throwaway database for the integration tests only. Deliberately NOT named
+# "babel.sqlite" so this script never clobbers a real ingest database built in
+# this directory (e.g. by run-ingest-aws.sh). It is removed on exit (see the
+# trap below), whether the tests pass, fail, or are interrupted.
+STITCH_SQLITE_FILE=${STITCH_DIR}/babel-test.sqlite
 BABEL_BASE_URL=https://stars.renci.org/var/babel_outputs/2026jul22
 BABEL_COMPENDIA_BASE_URL=${BABEL_BASE_URL}/compendia/
 BABEL_CONFLATION_BASE_URL=${BABEL_BASE_URL}/conflation/
@@ -16,6 +20,11 @@ BABEL_CONFLATION_BASE_URL=${BABEL_BASE_URL}/conflation/
 # Babel release with: python tools/refresh_test3_fixture.py).
 TEST_ARTIFACTS_DIR=${STITCH_DIR}/test-artifacts
 INGEST_BABEL_CMD=venv/bin/ingest-babel
+
+# Clean up the throwaway test database (and any SQLite sidecar files) on exit,
+# regardless of whether the tests succeed, fail, or are interrupted. The run
+# log is intentionally left in place for inspection.
+trap 'rm -f "${STITCH_SQLITE_FILE}" "${STITCH_SQLITE_FILE}"-wal "${STITCH_SQLITE_FILE}"-shm "${STITCH_SQLITE_FILE}"-journal' EXIT
 
 rm -f ${STITCH_LOG_FILE}
 

@@ -539,7 +539,10 @@ you will get a large number of errors from that unit test module.
 Running all four integration tests of `ingest_babel.py` 
 may take half an hour or more (and will require a fast Internet connection, 
 since the integration tests ingest various Babel compendia and
-conflation files, which they load remotely via HTTPS). To run the
+conflation files, which they load remotely via HTTPS). The tests build a
+throwaway database, `babel-test.sqlite`, in the current directory (so several
+GB of free disk are needed while they run); the script removes it automatically
+when it exits, whether the tests pass, fail, or are interrupted. To run the
 tests:
 ```
 cd stitch-proj
