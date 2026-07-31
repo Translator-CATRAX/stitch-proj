@@ -417,7 +417,10 @@ where ISODATE is the ISO date of the Babel release, like 20260722.
 Then, to run the ingest, follow these steps:
 - `ssh ubuntu@my-build-instance.rtx.ai` (if running in AWS); else just create a new `bash` session
 - [If you are running in an `i4i` AWS instance with a local SSD, run this command: 
-`curl -fsSL https://raw.githubusercontent.com/Translator-CATRAX/stitch-proj/refs/heads/main/tools/setup-i4i-instance.sh | bash`]
+```
+curl -fsSL https://raw.githubusercontent.com/Translator-CATRAX/stitch-proj/refs/heads/main/tools/setup-i4i-instance.sh | bash
+```
+in a bash session]
 - `cd stitch-proj`
 - `screen` (to enter a screen session)
 - `./instance-memory-tracker.sh`
