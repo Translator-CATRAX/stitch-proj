@@ -26,7 +26,7 @@ from stitch.local_babel import (
 
 @pytest.fixture(scope="session")
 def db_filename() -> str:
-    return "db/babel-20250901-p3.sqlite"
+    return "db/babel-20260722.sqlite"
 
 @pytest.fixture(scope="function")
 def pool():
@@ -136,14 +136,21 @@ def test_map_curie_to_preferred_curies(readonly_conn: sqlite3.Connection):
     res = map_curie_to_preferred_curies(readonly_conn, 'MESH:D014867')
     assert res == (('CHEBI:15377', 'biolink:SmallMolecule', 'MESH:D014867'),)
     res = map_curie_to_preferred_curies(readonly_conn, 'MESH:C115990')
-    assert set(res) == {('MESH:C115990', 'biolink:ChemicalEntity', 'MESH:C115990'),
-                        ('UMLS:C0000657', 'biolink:Protein', 'MESH:C115990')}
+    assert res == (('UMLS:C0000657', 'biolink:Protein', 'MESH:C115990'),)
+    # a CURIE that belongs to more than one clique
+    res = map_curie_to_preferred_curies(readonly_conn, 'MESH:D000079702')
+    assert set(res) == {('NCBITaxon:22663',
+                         'biolink:OrganismTaxon',
+                         'MESH:D000079702'),
+                        ('DRUGBANK:DB14317',
+                         'biolink:ComplexMolecularMixture',
+                         'MESH:D000079702')}
 
 
 def test_map_chembl(readonly_conn: sqlite3.Connection):
     res = map_curie_to_preferred_curies(readonly_conn, 'CHEMBL.COMPOUND:CHEMBL339829')
-    assert res == (('CHEMBL.COMPOUND:CHEMBL339829',
-                    'biolink:ChemicalEntity',
+    assert res == (('PUBCHEM.COMPOUND:281390',
+                    'biolink:SmallMolecule',
                     'CHEMBL.COMPOUND:CHEMBL339829'),)
 
 

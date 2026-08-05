@@ -77,17 +77,16 @@ application (~250 GiB free disk required; see [Requirements](#requirements)):
 # 1. Install stitch-proj from PyPI (Python 3.12+); runtime deps install automatically.
 pip install stitch-proj
 
-# 2. Download the pre-built Babel sqlite file (~217 GiB) to a location of your choice.
-curl -s -L https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250901-p3.sqlite \
-    > babel-20250901-p3.sqlite
+# 2. Download the pre-built Babel sqlite file (~198 GiB) to a location of your choice.
+curl -s -L https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20260722.sqlite \
+    > babel-20260722.sqlite
 ```
 
 Then from Python:
-
 ```python
 import stitch.local_babel as lb
 
-conn = lb.connect_to_db_read_only("babel-20250901-p3.sqlite")
+conn = lb.connect_to_db_read_only("babel-20260722.sqlite")
 res = lb.map_curie_to_preferred_curies(conn, "MESH:D014867")
 # → (("CHEBI:15377", "biolink:SmallMolecule", "MESH:D014867"),)
 ```
@@ -178,7 +177,7 @@ the Graviton3 processor. Testing has been done on the following MacOS system:
 - `openblas` installed via Homebrew
 
 # Downloading a pre-built Babel sqlite database file
-[`babel-20250901-p3.sqlite`](https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250901-p3.sqlite)
+[`babel-20260722.sqlite`](https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20260722.sqlite)
 (217 GiB) is available for download from AWS S3. For details and an MD5
 checksum hash, see the [Releases page](https://github.com/Translator-CATRAX/stitch-proj/releases)
 for the stitch project. You will need to download this file (or, alternatively,
@@ -203,8 +202,8 @@ way to satisfy that is:
 ```
 cd stitch-proj
 mkdir -p db
-curl -s -L https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20250901-p3.sqlite > \
-    db/babel-20250901-p3.sqlite
+curl -s -L https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20260722.sqlite > \
+    db/babel-20260722.sqlite
 ```
 
 A symbolic link `db -> /some/other/path` also works, if you want to keep
@@ -256,7 +255,7 @@ so each worker process can open its own connection):
 ```python
 import stitch.local_babel as lb
 
-conn = lb.connect_to_db_read_only("db/babel-20250901-p3.sqlite")
+conn = lb.connect_to_db_read_only("db/babel-20260722.sqlite")
 
 # Resolve a CURIE to its preferred CURIE(s) and type(s):
 res = lb.map_curie_to_preferred_curies(conn, "MESH:D014867")
