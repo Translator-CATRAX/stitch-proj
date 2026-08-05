@@ -684,10 +684,35 @@ quick checks are sometimes useful.
 To print the row counts of every table:
 ```
 cd stitch-proj
-venv/bin/python3 stitch/row_counts.py babel.sqlite
+venv/bin/python3 stitch/row_counts.py --pretty babel.sqlite
+```
+which will produce output like this:
+```
+types                             306
+identifiers               605,838,115
+cliques                   398,671,998
+descriptions               70,688,188
+identifiers_descriptions   70,688,188
+identifiers_cliques       605,864,191
+identifiers_taxa          220,065,113
+conflation_clusters        16,014,755
+conflation_members         35,304,724
+```
+If you omit the `--pretty` option, you just get `pprint.pprint` style
+output without the thousands place separators, like this:
+```
+{'cliques': 398671998,
+ 'conflation_clusters': 16014755,
+ 'conflation_members': 35304724,
+ 'descriptions': 70688188,
+ 'identifiers': 605838115,
+ 'identifiers_cliques': 605864191,
+ 'identifiers_descriptions': 70688188,
+ 'identifiers_taxa': 220065113,
+ 'types': 306}
 ```
 
-To get the file size in GiB (Linux/GNU `stat`):
+To get the Babel sqlite file size in GiB (Linux/GNU `stat`):
 ```
 stat -c %s babel.sqlite | awk '{printf "%.2f GiB\n", $1/1024/1024/1024}'
 ```
