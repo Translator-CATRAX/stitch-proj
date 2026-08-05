@@ -153,7 +153,7 @@ The `stitch-proj` project's module `ingest_babel.py` has been tested in three co
 ## Ubuntu/Xeon
 - We have tested a full run of `ingest_babel.py` on this system ([release `babel-sqlite-20250331`](https://github.com/Translator-CATRAX/stitch-proj/releases/tag/babel-20250331) and [release `babel-sqlite-20250817`](https://github.com/Translator-CATRAX/stitch-proj/releases/tag/babel-20250817)). This instance has instance name `stitch2.rtx.ai` and is in the `us-west-1` AWS region.
 - Ubuntu 24.04
-- `i4i.2xlarge` instance (Intel Xeon 8375C processor, which is x86_64 architecture), 64 GiB of memory
+- `i4i.xlarge` instance (Intel Xeon 8375C processor, which is x86_64 architecture), 32 GiB of memory
 - `gp3` root volume (500 GiB)
 - `Nitro SSD` volume (1.7 TiB)
 
@@ -447,7 +447,7 @@ This behavior cannot be overridden at the `python3.12` command-line.
 [The instructions below have been coded up in the experimental script
 [`tools/setup-i4i-instance.sh`](https://github.com/Translator-CATRAX/stitch-proj/blob/main/tools/setup-i4i-instance.sh).] The `i4i` series EC2 instances have local SSD storage
 that is ephemeral, i.e., the SSD volume must be set up anew each time the instance
-is started up. The `i4i.2xlarge` instance that we typically use for Babel ingests is 
+is started up. The `i4i.xlarge` instance that we typically use for Babel ingests is 
 `stitch2.rtx.ai`.
 
 Every time you start the instance, you should run:
