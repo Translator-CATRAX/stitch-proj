@@ -141,7 +141,7 @@ along with download links, file sizes, and MD5 checksums.
 
 # Requirements
 - CPython 3.12, which needs to be available in your path as `python3.12`, with the `venv` library installed and in the python path
-- At least 32 GiB of system memory
+- At least 32 GiB of system memory (we currently do builds on an `i4i.xlarge` EC2 instance)
 - Sufficient disk space in wherever filesystem hosts your `stitch-proj` directory, which will depend on your use-case:
   - To build `babel.sqlite`, at least 600 GiB of free file system storage space (usage transiently spikes to ~522 GiB and then the final database size is ~200 GiB).
   - To use a local `babel.sqlite` in your application, 250 GiB of free system storage space to store the sqlite file.
@@ -155,7 +155,7 @@ The `stitch-proj` project's module `ingest_babel.py` has been tested in three co
 ## Ubuntu/Xeon
 - We have tested a full run of `ingest_babel.py` on this system ([release `babel-sqlite-20250331`](https://github.com/Translator-CATRAX/stitch-proj/releases/tag/babel-20250331) and [release `babel-sqlite-20250817`](https://github.com/Translator-CATRAX/stitch-proj/releases/tag/babel-20250817)). This instance has instance name `stitch2.rtx.ai` and is in the `us-west-1` AWS region.
 - Ubuntu 24.04
-- `i4i.xlarge` instance (Intel Xeon 8375C processor, which is x86_64 architecture), 32 GiB of memory
+- `i4i.2xlarge` instance (Intel Xeon 8375C processor, which is x86_64 architecture), 64 GiB of memory
 - `gp3` root volume (500 GiB)
 - `Nitro SSD` volume (1.7 TiB)
 
