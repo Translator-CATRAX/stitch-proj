@@ -77,7 +77,9 @@ application (~250 GiB free disk required; see [Requirements](#requirements)):
 # 1. Install stitch-proj from PyPI (Python 3.12+); runtime deps install automatically.
 pip install stitch-proj
 
-# 2. Download the pre-built Babel sqlite file (~198 GiB) to a location of your choice.
+# 2. Download the pre-built Babel sqlite file (for the size estimate, see the 
+[Releases page](https://github.com/Translator-CATRAX/stitch-proj/releases)) 
+to a location of your choice.
 curl -s -L https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20260722.sqlite \
     > babel-20260722.sqlite
 ```
@@ -141,7 +143,7 @@ along with download links, file sizes, and MD5 checksums.
 - CPython 3.12, which needs to be available in your path as `python3.12`, with the `venv` library installed and in the python path
 - At least 32 GiB of system memory
 - Sufficient disk space in wherever filesystem hosts your `stitch-proj` directory, which will depend on your use-case:
-  - To build `babel.sqlite`, at least 600 GiB of free file system storage space (usage transiently spikes to ~522 GiB and then the final database size is ~217 GiB).
+  - To build `babel.sqlite`, at least 600 GiB of free file system storage space (usage transiently spikes to ~522 GiB and then the final database size is ~200 GiB).
   - To use a local `babel.sqlite` in your application, 250 GiB of free system storage space to store the sqlite file.
 - Linux or MacOS (this software has not been tested on Windows; see "Systems on which this software has been tested").
 - If you want to download the pre-built Babel sqlite database file, you will need to have `curl` installed.
@@ -207,7 +209,8 @@ curl -s -L https://rtx-kg2-public.s3.us-west-2.amazonaws.com/babel-20260722.sqli
 ```
 
 A symbolic link `db -> /some/other/path` also works, if you want to keep
-the 217 GiB file off the volume hosting `stitch-proj`.
+the very large sqlite file out of the volume that hosts the `stitch-proj`
+directory.
 
 # Installing stitch-proj from PyPI
 
